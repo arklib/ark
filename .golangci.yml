@@ -1,0 +1,19 @@
+# go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
+run:
+  timeout: 5m
+  modules-download-mode: readonly
+
+linters:
+  enable:
+    - typecheck
+    - goimports
+    - misspell
+    - govet
+    - gosimple
+    - ineffassign
+    - unused
+    - errcheck
+
+linters-settings:
+  errcheck:
+    ignore: ""
