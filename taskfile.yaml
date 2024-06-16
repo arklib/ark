@@ -1,0 +1,8 @@
+version: '3'
+# go install github.com/go-task/task/v3/cmd/task@latest
+
+tasks:
+  default:
+    desc: Run Go Lint
+    cmds:
+      - golangci-lint run
