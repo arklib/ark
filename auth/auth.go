@@ -34,7 +34,7 @@ type Auth struct {
 func New(secretKey []byte, expires time.Duration, tokenLookup string) (auth *Auth, err error) {
 	if len(secretKey) == 0 {
 		err = errx.Sprintf(
-			"please configure secretKey: %s",
+			"please configure auth secretKey: %s",
 			NewAuthSecretKey())
 		return
 	}

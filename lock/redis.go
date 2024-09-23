@@ -12,7 +12,7 @@ type Redis struct {
 	client redis.Cmdable
 }
 
-func NewRedis(client redis.Cmdable) *Redis {
+func NewRedisDriver(client redis.Cmdable) *Redis {
 	return &Redis{client: client}
 }
 
