@@ -73,8 +73,8 @@ func (c *rpcClient) init(srv *Server) error {
 		options = append(options, client.WithResolver(r))
 	}
 
-	// discover services
-	for _, name := range config.Services {
+	// discover services name
+	for _, name := range config.Discover {
 		basicInfo := &rpcinfo.EndpointBasicInfo{ServiceName: name}
 		cliOptions := append(
 			options,

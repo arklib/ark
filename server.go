@@ -52,7 +52,7 @@ type ServerConfig struct {
 	RPCClient struct {
 		Enable     bool
 		Timeout    time.Duration `default:"30s"`
-		Services   []string
+		Discover   []string
 		UseTracing bool
 		UseCodec   string `default:"frugal"`
 	}
