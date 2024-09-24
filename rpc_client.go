@@ -52,7 +52,7 @@ func (c *rpcClient) init(srv *Server) error {
 	}
 
 	// codec
-	codec, err := payload.NewSerializer(config.UseCodec)
+	codec, err := payload.New(config.UseCodec)
 	if err != nil {
 		return err
 	}
