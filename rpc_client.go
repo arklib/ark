@@ -12,7 +12,7 @@ import (
 
 	"github.com/arklib/ark/errx"
 	"github.com/arklib/ark/registry"
-	"github.com/arklib/ark/rpc/payload"
+	"github.com/arklib/ark/rpc"
 )
 
 var EmptyRPCMethodInfo = kesvc.NewMethodInfo(
@@ -52,7 +52,7 @@ func (c *rpcClient) init(srv *Server) error {
 	}
 
 	// codec
-	codec, err := payload.New(config.UseCodec)
+	codec, err := rpc.NewCodec()
 	if err != nil {
 		return err
 	}

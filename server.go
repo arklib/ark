@@ -42,7 +42,6 @@ type ServerConfig struct {
 		UseTracing  bool
 		UseRecovery bool
 		UseValidate bool
-		UseCodec    string `default:"frugal"`
 		// generate code
 		UseCodeGen struct {
 			Enable bool
@@ -54,7 +53,6 @@ type ServerConfig struct {
 		Timeout    time.Duration `default:"30s"`
 		Discover   []string
 		UseTracing bool
-		UseCodec   string `default:"frugal"`
 	}
 }
 
