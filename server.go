@@ -1,6 +1,7 @@
 package ark
 
 import (
+	"context"
 	"log"
 	"os"
 	"time"
@@ -14,7 +15,7 @@ import (
 )
 
 type ServerConfig struct {
-	Mode       string
+	Mode       string `default:"prod"`
 	Lang       string `default:"en"`
 	Logger     *logger.Config
 	Registry   *registry.Config
@@ -98,7 +99,6 @@ func (srv *Server) init() (err error) {
 
 	// logger
 	if srv.IsDev() {
-		srv.Dump(srv.Config.Data())
 		srv.Logger = logger.NewConsole(sc.Logger)
 	} else {
 		srv.Logger = logger.New(sc.Logger)
@@ -114,23 +114,16 @@ func (srv *Server) init() (err error) {
 
 	// rpc server
 	if sc.RPCServer.Enable {
-		srv.RPCServer, err = newRPCServer(srv)
-		if err != nil {
-			return
-		}
+		srv.RPCServer = newRPCServer(srv)
 	}
 
 	// rpc client
 	if sc.RPCClient.Enable {
-		srv.RPCClient, err = newRPCClient(srv)
-		if err != nil {
-			return
-		}
+		srv.RPCClient = newRPCClient(srv)
 	}
 	return
 }
 
-// IsDev server mode == "dev"
 func (srv *Server) IsDev() bool {
 	return srv.Mode == "dev"
 }
@@ -145,6 +138,16 @@ func (srv *Server) BindConfig(key string, value any) error {
 	return srv.Config.BindStruct(key, value)
 }
 
+// Fetch http service
+func (srv *Server) Fetch(ctx context.Context, path string, in, out any) error {
+	return nil
+}
+
+// RPC thrift service
+func (srv *Server) RPC(ctx context.Context, path string, in, out any) error {
+	return srv.RPCClient.Call(ctx, path, in, out)
+}
+
 // Run http server & rpc server
 func (srv *Server) Run() {
 	if srv.isRun {
@@ -152,18 +155,25 @@ func (srv *Server) Run() {
 	}
 	srv.isRun = true
 
-	errCh := make(chan error)
-	// start http server
-	if srv.HttpServer != nil {
-		go func() {
-			errCh <- srv.HttpServer.run()
-		}()
+	// init rpc client
+	if srv.RPCClient != nil {
+		if err := srv.RPCClient.init(); err != nil {
+			log.Fatal(err)
+		}
 	}
 
+	errCh := make(chan error)
 	// start rpc server
 	if srv.RPCServer != nil {
 		go func() {
 			errCh <- srv.RPCServer.run()
+		}()
+	}
+
+	// start http server
+	if srv.HttpServer != nil {
+		go func() {
+			errCh <- srv.HttpServer.run()
 		}()
 	}
 

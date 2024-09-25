@@ -32,22 +32,44 @@ func (l *Logger) SetLevel(level klog.Level) {
 type rpcServer struct {
 	*rpcRouter
 
-	srv      *Server
-	keSrv    kesrv.Server
-	keSvc    *kesvc.ServiceInfo
-	allRoute RPCRoutes
+	srv    *Server
+	keSrv  kesrv.Server
+	keSvc  *kesvc.ServiceInfo
+	Routes RPCRoutes
 }
 
-func newRPCServer(srv *Server) (*rpcServer, error) {
+func newRPCServer(srv *Server) *rpcServer {
 	s := &rpcServer{
 		rpcRouter: newRPCRouter("", nil),
 		srv:       srv,
 	}
-	return s, s.init(srv)
+	return s
 }
 
-func (s *rpcServer) init(srv *Server) error {
-	srv.Logger.Info("[ark] init rpc server")
+func (s *rpcServer) run() error {
+	if s.keSrv == nil {
+		if err := s.init(); err != nil {
+			return err
+		}
+	}
+	// setup router
+	err := s.rpcRouter.setupRouter(s, &s.Routes)
+	if err != nil {
+		return err
+	}
+
+	// gen code
+	if s.srv.IsDev() {
+		if err = s.genCode(); err != nil {
+			return err
+		}
+	}
+	return s.keSrv.Run()
+}
+
+func (s *rpcServer) init() error {
+	srv := s.srv
+	srv.Logger.Debug("[ark] init rpc server")
 
 	// set logger
 	klog.SetLogger(&Logger{srv.Logger})
@@ -113,18 +135,18 @@ func (s *rpcServer) init(srv *Server) error {
 
 	// recovery
 	if config.UseRecovery {
-		s.UseApiMiddleware(s.UseRecovery())
+		s.AddMiddleware(s.UseRecovery())
 	}
 
 	// validate
 	if config.UseValidate {
-		s.UseApiMiddleware(s.UseValidate())
+		s.AddMiddleware(s.UseValidate())
 	}
 
 	return nil
 }
 
-func (s *rpcServer) UseRecovery() ApiMiddleware {
+func (s *rpcServer) UseRecovery() Middleware {
 	return func(p *ApiPayload) (err error) {
 		defer func() {
 			if val := recover(); val != nil {
@@ -136,7 +158,7 @@ func (s *rpcServer) UseRecovery() ApiMiddleware {
 	}
 }
 
-func (s *rpcServer) UseValidate() ApiMiddleware {
+func (s *rpcServer) UseValidate() Middleware {
 	return func(p *ApiPayload) error {
 		err := s.srv.Validator.Test(p.In, "")
 		if err != nil {
@@ -150,7 +172,7 @@ func (s *rpcServer) KeServer() kesrv.Server {
 	return s.keSrv
 }
 
-func (s *rpcServer) ClientSource(pkgName string) ([]byte, error) {
+func (s *rpcServer) GetClientSourceCode(pkgName string) ([]byte, error) {
 	config := s.srv.config.RPCServer
 
 	// pkg code
@@ -163,14 +185,14 @@ func (s *rpcServer) ClientSource(pkgName string) ([]byte, error) {
 	}
 
 	write("type Service struct {")
-	write("    at *ark.At")
+	write("    srv *ark.Server")
 	write("}\n")
 
-	write("func New(at *ark.At) *Service {")
-	write("    return &Service{at}")
+	write("func New(srv *ark.Server) *Service {")
+	write("    return &Service{srv}")
 	write("}\n")
 
-	for _, route := range s.allRoute {
+	for _, route := range s.Routes {
 		hInfo := route.Handler
 		in := pkg.AddStruct(hInfo.NewInput())
 		out := pkg.AddStruct(hInfo.NewOutput())
@@ -181,17 +203,17 @@ func (s *rpcServer) ClientSource(pkgName string) ([]byte, error) {
 		}
 
 		// comment: intro
-		if route.Intro != "" {
-			write("// %s", route.Intro)
+		if route.Describe != "" {
+			write("// %s", route.Describe)
 		}
 
-		write("func (s *Service) %s(in *%s) (out *%s, err error) {",
+		write("func (s *Service) %s(at ark.At, in *%s) (out *%s, err error) {",
 			hInfo.Name,
 			in.Name,
 			out.Name,
 		)
 		write("    out = new(%s)", out.Name)
-		write(`    err = s.at.FetchSvc("%s/%s", in, out)`, config.Name, route.FullPath)
+		write(`    err = s.srv.RPC(at, "%s/%s", in, out)`, config.Name, route.FullPath)
 		write("    return")
 		write("}\n")
 	}
@@ -213,7 +235,7 @@ func (s *rpcServer) genCode() error {
 
 	// client code
 	_, pkgName := codegen.ParsePkgPath(config.Output)
-	code, err := s.ClientSource(pkgName)
+	code, err := s.GetClientSourceCode(pkgName)
 	if err != nil {
 		return err
 	}
@@ -223,22 +245,6 @@ func (s *rpcServer) genCode() error {
 	return os.WriteFile(codeFile, code, 0444)
 }
 
-func (s *rpcServer) AllRoute() RPCRoutes {
-	return s.allRoute
-}
-
-func (s *rpcServer) run() error {
-	// setup router
-	err := s.rpcRouter.setupRouter(s, &s.allRoute)
-	if err != nil {
-		return err
-	}
-
-	// gen code
-	err = s.genCode()
-	if err != nil {
-		return err
-	}
-
-	return s.keSrv.Run()
+func (s *rpcServer) GetRoutes() RPCRoutes {
+	return s.Routes
 }

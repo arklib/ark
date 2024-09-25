@@ -13,31 +13,30 @@ import (
 type (
 	RPCRoutes = []*RPCRoute
 	RPCRoute  struct {
-		Title          string
-		Intro          string
-		Path           string
-		Handler        *ApiProxy
-		ApiMiddlewares ApiMiddlewares
-		FullPath       string
+		Title       string
+		Describe    string
+		Path        string
+		Handler     *ApiProxy
+		Middlewares Middlewares
+		FullPath    string
+	}
+	rpcRouter struct {
+		parent      *rpcRouter
+		nodes       []*rpcRouter
+		path        string
+		routes      RPCRoutes
+		middlewares Middlewares
+		Title       string
+		Describe    string
 	}
 )
-
-type rpcRouter struct {
-	parent         *rpcRouter
-	nodes          []*rpcRouter
-	path           string
-	routes         RPCRoutes
-	apiMiddlewares ApiMiddlewares
-	Title          string
-	Intro          string
-}
 
 func newRPCRouter(path string, r *rpcRouter) *rpcRouter {
 	return &rpcRouter{path: path, parent: r}
 }
 
-func (r *rpcRouter) UseApiMiddleware(middlewares ...ApiMiddleware) *rpcRouter {
-	r.apiMiddlewares = append(r.apiMiddlewares, middlewares...)
+func (r *rpcRouter) AddMiddleware(middlewares ...Middleware) *rpcRouter {
+	r.middlewares = append(r.middlewares, middlewares...)
 	return r
 }
 
@@ -69,15 +68,15 @@ func (r *rpcRouter) AddRoutes(routes RPCRoutes) *rpcRouter {
 	return r
 }
 
-func (r *rpcRouter) upApiMiddlewares() ApiMiddlewares {
+func (r *rpcRouter) upMiddlewares() Middlewares {
 	router := r
-	var middlewares ApiMiddlewares
+	var middlewares Middlewares
 	for {
 		if router == nil {
 			break
 		}
-		if len(router.apiMiddlewares) > 0 {
-			middlewares = append(router.apiMiddlewares, middlewares...)
+		if len(router.middlewares) > 0 {
+			middlewares = append(router.middlewares, middlewares...)
 		}
 		router = router.parent
 	}
@@ -87,7 +86,7 @@ func (r *rpcRouter) upApiMiddlewares() ApiMiddlewares {
 func (r *rpcRouter) setupRouter(rpcSrv *rpcServer, routes *RPCRoutes) error {
 	config := rpcSrv.srv.config.RPCServer
 	httpSrv := rpcSrv.srv.HttpServer
-	upApiMiddlewares := r.upApiMiddlewares()
+	upMiddlewares := r.upMiddlewares()
 
 	for _, route := range r.routes {
 		if route.Handler == nil {
@@ -111,10 +110,10 @@ func (r *rpcRouter) setupRouter(rpcSrv *rpcServer, routes *RPCRoutes) error {
 		apiProxy.Srv = rpcSrv.srv
 		apiProxy.Path = route.FullPath
 
-		// up api middlewares + route.apiMiddlewares
-		route.ApiMiddlewares = append(upApiMiddlewares, route.ApiMiddlewares...)
-		// add api proxy middlewares
-		apiProxy.Use(route.ApiMiddlewares...)
+		// up api httpMiddlewares + route.middlewares
+		route.Middlewares = append(upMiddlewares, route.Middlewares...)
+		// add api proxy httpMiddlewares
+		apiProxy.Use(route.Middlewares...)
 
 		// add kitex service method
 		rpcSrv.keSvc.Methods[route.FullPath] = kesvc.NewMethodInfo(
@@ -127,11 +126,12 @@ func (r *rpcRouter) setupRouter(rpcSrv *rpcServer, routes *RPCRoutes) error {
 		// add http route
 		if config.UseHttp && httpSrv != nil {
 			httpSrv.AddRoute(&HttpRoute{
-				Title:   route.Title,
-				Intro:   route.Intro,
-				Method:  "POST",
-				Path:    fmt.Sprintf("%s/%s", config.Name, route.FullPath),
-				Handler: route.Handler,
+				Title:       route.Title,
+				Describe:    route.Describe,
+				Method:      "POST",
+				Path:        fmt.Sprintf("%s/%s", config.Name, route.FullPath),
+				Handler:     route.Handler,
+				Middlewares: route.Middlewares,
 			})
 		}
 	}

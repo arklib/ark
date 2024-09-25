@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	hzapp "github.com/cloudwego/hertz/pkg/app"
+	hz "github.com/cloudwego/hertz/pkg/app"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/samber/lo"
 
@@ -20,7 +20,6 @@ const StoreUserKey = "user"
 var ErrAuthFailed = errx.New("auth failed", 401)
 
 type Payload struct {
-	*User
 	*jwt.RegisteredClaims
 }
 
@@ -57,10 +56,9 @@ func New(secretKey []byte, expires time.Duration, tokenLookup string) (auth *Aut
 	return
 }
 
-func (auth *Auth) NewToken(user *User) (string, error) {
+func (auth *Auth) NewToken(data map[string]any) (string, error) {
 	expiresAt := time.Now().Add(auth.Expires)
 	payload := &Payload{
-		user,
 		&jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(expiresAt),
 		},
@@ -84,13 +82,12 @@ func (auth *Auth) ParseToken(signed string) (user *User, err error) {
 		err = ErrAuthFailed
 	}
 
-	user = payload.User
 	return
 }
 
-func (auth *Auth) HttpMiddleware(roles ...string) hzapp.HandlerFunc {
-	return func(ctx context.Context, req *hzapp.RequestContext) {
-		token, err := auth.GetHttpToken(req)
+func (auth *Auth) HttpMiddleware(roles ...string) hz.HandlerFunc {
+	return func(ctx context.Context, req *hz.RequestContext) {
+		token, err := auth.FindHttpToken(req)
 		if err != nil {
 			result.Error(req, err)
 			return
@@ -107,7 +104,7 @@ func (auth *Auth) HttpMiddleware(roles ...string) hzapp.HandlerFunc {
 	}
 }
 
-func (auth *Auth) GetHttpToken(req *hzapp.RequestContext) (token string, err error) {
+func (auth *Auth) FindHttpToken(req *hz.RequestContext) (token string, err error) {
 	for method, name := range auth.TokenLookup {
 		switch method {
 		case "header":

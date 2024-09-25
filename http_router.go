@@ -5,51 +5,51 @@ import (
 	"log"
 	"strings"
 
-	hzapp "github.com/cloudwego/hertz/pkg/app"
+	hz "github.com/cloudwego/hertz/pkg/app"
 
 	"github.com/arklib/ark/errx"
 )
 
 type (
-	HttpBaseHandler = hzapp.HandlerFunc
+	HttpBaseHandler = hz.HandlerFunc
 	HttpMiddlewares = []HttpMiddleware
-	HttpMiddleware  = hzapp.HandlerFunc
+	HttpMiddleware  = hz.HandlerFunc
 
 	HttpRoutes = []*HttpRoute
 	HttpRoute  struct {
-		Title          string
-		Intro          string
-		Method         string
-		Path           string
-		Handler        *ApiProxy
-		Middlewares    HttpMiddlewares
-		ApiMiddlewares ApiMiddlewares
-		FullPath       string
+		Title           string
+		Describe        string
+		Method          string
+		Path            string
+		Handler         *ApiProxy
+		Middlewares     Middlewares
+		HttpMiddlewares HttpMiddlewares
+		FullPath        string
 	}
 )
 
 type httpRouter struct {
-	parent         *httpRouter
-	nodes          []*httpRouter
-	path           string
-	routes         HttpRoutes
-	middlewares    HttpMiddlewares
-	apiMiddlewares ApiMiddlewares
-	Title          string
-	Intro          string
+	parent          *httpRouter
+	nodes           []*httpRouter
+	path            string
+	routes          HttpRoutes
+	middlewares     Middlewares
+	httpMiddlewares HttpMiddlewares
+	Title           string
+	Describe        string
 }
 
 func newHttpRouter(path string, r *httpRouter) *httpRouter {
 	return &httpRouter{path: path, parent: r}
 }
 
-func (r *httpRouter) Use(middlewares ...HttpMiddleware) *httpRouter {
+func (r *httpRouter) AddMiddleware(middlewares ...Middleware) *httpRouter {
 	r.middlewares = append(r.middlewares, middlewares...)
 	return r
 }
 
-func (r *httpRouter) UseApiMiddleware(middlewares ...ApiMiddleware) *httpRouter {
-	r.apiMiddlewares = append(r.apiMiddlewares, middlewares...)
+func (r *httpRouter) AddHttpMiddleware(middlewares ...HttpMiddleware) *httpRouter {
+	r.httpMiddlewares = append(r.httpMiddlewares, middlewares...)
 	return r
 }
 
@@ -65,14 +65,14 @@ func (r *httpRouter) Group(path string, middlewares ...HttpMiddleware) *httpRout
 	}
 
 	router := newHttpRouter(path, r)
-	router.middlewares = middlewares
+	router.httpMiddlewares = middlewares
 
 	r.nodes = append(r.nodes, router)
 	return router
 }
 
 func (r *httpRouter) AddRoute(route *HttpRoute, middlewares ...HttpMiddleware) *httpRouter {
-	route.Middlewares = append(route.Middlewares, middlewares...)
+	route.HttpMiddlewares = append(route.HttpMiddlewares, middlewares...)
 	r.routes = append(r.routes, route)
 	return r
 }
@@ -81,13 +81,12 @@ func (r *httpRouter) AddRoutes(routes HttpRoutes, middlewares ...HttpMiddleware)
 	for _, route := range routes {
 		r.AddRoute(route)
 	}
-	r.Use(middlewares...)
+	r.AddHttpMiddleware(middlewares...)
 	return r
 }
-
-func (r *httpRouter) upMiddlewares() HttpMiddlewares {
+func (r *httpRouter) upMiddlewares() Middlewares {
 	router := r
-	var middlewares HttpMiddlewares
+	var middlewares Middlewares
 	for {
 		if router == nil {
 			break
@@ -100,15 +99,15 @@ func (r *httpRouter) upMiddlewares() HttpMiddlewares {
 	return middlewares
 }
 
-func (r *httpRouter) upApiMiddlewares() ApiMiddlewares {
+func (r *httpRouter) upHttpMiddlewares() HttpMiddlewares {
 	router := r
-	var middlewares ApiMiddlewares
+	var middlewares HttpMiddlewares
 	for {
 		if router == nil {
 			break
 		}
-		if len(router.apiMiddlewares) > 0 {
-			middlewares = append(router.apiMiddlewares, middlewares...)
+		if len(router.httpMiddlewares) > 0 {
+			middlewares = append(router.httpMiddlewares, middlewares...)
 		}
 		router = router.parent
 	}
@@ -117,7 +116,7 @@ func (r *httpRouter) upApiMiddlewares() ApiMiddlewares {
 
 func (r *httpRouter) setupRouter(httpSrv *httpServer, routes *HttpRoutes) (err error) {
 	upMiddlewares := r.upMiddlewares()
-	upApiMiddlewares := r.upApiMiddlewares()
+	upHttpMiddlewares := r.upHttpMiddlewares()
 
 	for _, route := range r.routes {
 		if route.Handler == nil {
@@ -145,17 +144,17 @@ func (r *httpRouter) setupRouter(httpSrv *httpServer, routes *HttpRoutes) (err e
 		apiProxy.Srv = httpSrv.srv
 		apiProxy.Path = route.FullPath
 
-		// up middlewares + route.middlewares
+		// up httpMiddlewares + route.httpMiddlewares
+		route.HttpMiddlewares = append(upHttpMiddlewares, route.HttpMiddlewares...)
+
+		// up api httpMiddlewares + route.middlewares
 		route.Middlewares = append(upMiddlewares, route.Middlewares...)
 
-		// up api middlewares + route.apiMiddlewares
-		route.ApiMiddlewares = append(upApiMiddlewares, route.ApiMiddlewares...)
+		// add api.proxy httpMiddlewares
+		apiProxy.Use(route.Middlewares...)
 
-		// add api.proxy middlewares
-		apiProxy.Use(route.ApiMiddlewares...)
-
-		// middlewares + apiProxy.HttpHandler
-		handlers := append(route.Middlewares, apiProxy.HttpHandler)
+		// httpMiddlewares + apiProxy.HttpHandler
+		handlers := append(route.HttpMiddlewares, apiProxy.HttpHandler)
 
 		// register route
 		httpSrv.hzSrv.Handle(route.Method, route.FullPath, handlers...)

@@ -14,9 +14,9 @@ import (
 type httpServer struct {
 	*httpRouter
 
-	srv      *Server
-	hzSrv    *hzsrv.Hertz
-	allRoute HttpRoutes
+	srv    *Server
+	hzSrv  *hzsrv.Hertz
+	Routes HttpRoutes
 }
 
 func newHttpServer(srv *Server) *httpServer {
@@ -24,13 +24,27 @@ func newHttpServer(srv *Server) *httpServer {
 		httpRouter: newHttpRouter("", nil),
 		srv:        srv,
 	}
-	s.init(srv)
 	return s
 }
 
-func (s *httpServer) init(srv *Server) {
-	logger := srv.Logger
-	logger.Info("[ark] init http server")
+func (s *httpServer) run() error {
+	if s.hzSrv == nil {
+		s.init()
+	}
+
+	// setup router
+	err := s.setupRouter(s, &s.Routes)
+	if err != nil {
+		return err
+	}
+
+	return s.hzSrv.Run()
+}
+
+func (s *httpServer) init() {
+	srv := s.srv
+	srv.Logger.Debug("[ark] init http server")
+
 	// set logger
 	hlog.SetLogger(srv.Logger)
 
@@ -46,37 +60,37 @@ func (s *httpServer) init(srv *Server) {
 	// recovery
 	if config.UseRecovery {
 		hzSrv.Use(middleware.Recovery())
-		logger.Info("[http.server] recovery enabled")
+		srv.Logger.Debug("[http.server] recovery enabled")
 	}
 
 	// cors
 	if config.UseCORS {
 		hzSrv.Use(cors.Default())
-		logger.Info("[http.server] cors enabled")
+		srv.Logger.Debug("[http.server] cors enabled")
 	}
 
 	// gzip
 	if config.UseGzip != 0 {
 		hzSrv.Use(gzip.Gzip(config.UseGzip))
-		logger.Info("[http.server] gzip enabled")
+		srv.Logger.Debug("[http.server] gzip enabled")
 	}
 
 	// etag
 	if config.UseETag {
 		// hzSrv.Use(etag.New())
-		logger.Info("[http.server] etag enabled")
+		srv.Logger.Debug("[http.server] etag enabled")
 	}
 
 	// access log
 	if config.UseAccessLog {
 		hzSrv.Use(accesslog.New())
-		logger.Info("[http.server] accessLog enabled")
+		srv.Logger.Debug("[http.server] accessLog enabled")
 	}
 
 	// static file routes
 	for _, route := range config.UseFileRoutes {
 		hzSrv.Static(route.Path, route.Root)
-		logger.Infof("[http.server] fileRoute '%s' -> '%s'", route.Path, route.Root)
+		srv.Logger.Debugf("[http.server] fileRoute '%s' -> '%s'", route.Path, route.Root)
 	}
 
 	s.hzSrv = hzSrv
@@ -86,16 +100,6 @@ func (s *httpServer) HzServer() *hzsrv.Hertz {
 	return s.hzSrv
 }
 
-func (s *httpServer) AllRoute() HttpRoutes {
-	return s.allRoute
-}
-
-func (s *httpServer) run() error {
-	// setup router
-	err := s.setupRouter(s, &s.allRoute)
-	if err != nil {
-		return err
-	}
-
-	return s.hzSrv.Run()
+func (s *httpServer) GetRoutes() HttpRoutes {
+	return s.Routes
 }

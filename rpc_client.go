@@ -6,7 +6,7 @@ import (
 
 	"github.com/cloudwego/kitex/client"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
-	kesvc "github.com/cloudwego/kitex/pkg/serviceinfo"
+	keService "github.com/cloudwego/kitex/pkg/serviceinfo"
 	"github.com/cloudwego/kitex/transport"
 	"github.com/kitex-contrib/obs-opentelemetry/tracing"
 
@@ -15,7 +15,7 @@ import (
 	"github.com/arklib/ark/rpc"
 )
 
-var EmptyRPCMethodInfo = kesvc.NewMethodInfo(
+var EmptyRPCMethodInfo = keService.NewMethodInfo(
 	func(ctx context.Context, handler, in, out any) error { return nil },
 	func() any { return nil },
 	func() any { return nil },
@@ -23,7 +23,7 @@ var EmptyRPCMethodInfo = kesvc.NewMethodInfo(
 )
 
 type rpcService struct {
-	keSvc  *kesvc.ServiceInfo
+	keSvc  *keService.ServiceInfo
 	client client.Client
 }
 
@@ -32,16 +32,18 @@ type rpcClient struct {
 	services map[string]*rpcService
 }
 
-func newRPCClient(srv *Server) (*rpcClient, error) {
+func newRPCClient(srv *Server) *rpcClient {
 	cli := &rpcClient{
 		srv:      srv,
 		services: make(map[string]*rpcService),
 	}
-	return cli, cli.init(srv)
+	return cli
 }
 
-func (c *rpcClient) init(srv *Server) error {
-	srv.Logger.Info("[ark] init rpc client")
+func (c *rpcClient) init() error {
+	srv := c.srv
+
+	srv.Logger.Debug("[ark] init rpc client")
 	config := srv.config.RPCClient
 
 	// base options
@@ -82,10 +84,10 @@ func (c *rpcClient) init(srv *Server) error {
 			client.WithClientBasicInfo(basicInfo),
 		)
 
-		keSvc := &kesvc.ServiceInfo{
+		keSvc := &keService.ServiceInfo{
 			ServiceName:  name,
-			Methods:      make(map[string]kesvc.MethodInfo),
-			PayloadCodec: kesvc.Thrift,
+			Methods:      make(map[string]keService.MethodInfo),
+			PayloadCodec: keService.Thrift,
 		}
 
 		cli, err := client.NewClient(keSvc, cliOptions...)

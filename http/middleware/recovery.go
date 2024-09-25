@@ -3,14 +3,14 @@ package middleware
 import (
 	"context"
 
-	hzapp "github.com/cloudwego/hertz/pkg/app"
+	hz "github.com/cloudwego/hertz/pkg/app"
 
 	"github.com/arklib/ark/errx"
 	"github.com/arklib/ark/http/result"
 )
 
-func Recovery() hzapp.HandlerFunc {
-	return func(c context.Context, ctx *hzapp.RequestContext) {
+func Recovery() hz.HandlerFunc {
+	return func(c context.Context, ctx *hz.RequestContext) {
 		defer func() {
 			if val := recover(); val != nil {
 				switch {
