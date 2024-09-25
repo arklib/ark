@@ -20,9 +20,9 @@ type (
 		Middlewares Middlewares
 		FullPath    string
 	}
-	rpcRouter struct {
-		parent      *rpcRouter
-		nodes       []*rpcRouter
+	RPCRouter struct {
+		parent      *RPCRouter
+		nodes       []*RPCRouter
 		path        string
 		routes      RPCRoutes
 		middlewares Middlewares
@@ -31,16 +31,16 @@ type (
 	}
 )
 
-func newRPCRouter(path string, r *rpcRouter) *rpcRouter {
-	return &rpcRouter{path: path, parent: r}
+func newRPCRouter(path string, r *RPCRouter) *RPCRouter {
+	return &RPCRouter{path: path, parent: r}
 }
 
-func (r *rpcRouter) AddMiddleware(middlewares ...Middleware) *rpcRouter {
+func (r *RPCRouter) AddMiddleware(middlewares ...Middleware) *RPCRouter {
 	r.middlewares = append(r.middlewares, middlewares...)
 	return r
 }
 
-func (r *rpcRouter) Group(path string) *rpcRouter {
+func (r *RPCRouter) Group(path string) *RPCRouter {
 	path = strings.Trim(path, "/")
 	if path == "" {
 		log.Println("group path cannot be empty")
@@ -56,19 +56,19 @@ func (r *rpcRouter) Group(path string) *rpcRouter {
 	return router
 }
 
-func (r *rpcRouter) AddRoute(route *RPCRoute) *rpcRouter {
+func (r *RPCRouter) AddRoute(route *RPCRoute) *RPCRouter {
 	r.routes = append(r.routes, route)
 	return r
 }
 
-func (r *rpcRouter) AddRoutes(routes RPCRoutes) *rpcRouter {
+func (r *RPCRouter) AddRoutes(routes RPCRoutes) *RPCRouter {
 	for _, route := range routes {
 		r.AddRoute(route)
 	}
 	return r
 }
 
-func (r *rpcRouter) upMiddlewares() Middlewares {
+func (r *RPCRouter) upMiddlewares() Middlewares {
 	router := r
 	var middlewares Middlewares
 	for {
@@ -83,7 +83,7 @@ func (r *rpcRouter) upMiddlewares() Middlewares {
 	return middlewares
 }
 
-func (r *rpcRouter) setupRouter(rpcSrv *rpcServer, routes *RPCRoutes) error {
+func (r *RPCRouter) setupRouter(rpcSrv *rpcServer, routes *RPCRoutes) error {
 	config := rpcSrv.srv.config.RPCServer
 	httpSrv := rpcSrv.srv.HttpServer
 	upMiddlewares := r.upMiddlewares()

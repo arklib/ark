@@ -30,7 +30,7 @@ func (l *Logger) SetLevel(level klog.Level) {
 }
 
 type rpcServer struct {
-	*rpcRouter
+	*RPCRouter
 
 	srv    *Server
 	keSrv  kesrv.Server
@@ -40,7 +40,7 @@ type rpcServer struct {
 
 func newRPCServer(srv *Server) *rpcServer {
 	s := &rpcServer{
-		rpcRouter: newRPCRouter("", nil),
+		RPCRouter: newRPCRouter("", nil),
 		srv:       srv,
 	}
 	return s
@@ -53,7 +53,7 @@ func (s *rpcServer) run() error {
 		}
 	}
 	// setup router
-	err := s.rpcRouter.setupRouter(s, &s.Routes)
+	err := s.RPCRouter.setupRouter(s, &s.Routes)
 	if err != nil {
 		return err
 	}

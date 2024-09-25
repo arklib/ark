@@ -12,7 +12,7 @@ import (
 )
 
 type httpServer struct {
-	*httpRouter
+	*HttpRouter
 
 	srv    *Server
 	hzSrv  *hzsrv.Hertz
@@ -21,7 +21,7 @@ type httpServer struct {
 
 func newHttpServer(srv *Server) *httpServer {
 	s := &httpServer{
-		httpRouter: newHttpRouter("", nil),
+		HttpRouter: newHttpRouter("", nil),
 		srv:        srv,
 	}
 	return s

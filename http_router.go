@@ -28,9 +28,9 @@ type (
 	}
 )
 
-type httpRouter struct {
-	parent          *httpRouter
-	nodes           []*httpRouter
+type HttpRouter struct {
+	parent          *HttpRouter
+	nodes           []*HttpRouter
 	path            string
 	routes          HttpRoutes
 	middlewares     Middlewares
@@ -39,21 +39,21 @@ type httpRouter struct {
 	Describe        string
 }
 
-func newHttpRouter(path string, r *httpRouter) *httpRouter {
-	return &httpRouter{path: path, parent: r}
+func newHttpRouter(path string, r *HttpRouter) *HttpRouter {
+	return &HttpRouter{path: path, parent: r}
 }
 
-func (r *httpRouter) AddMiddleware(middlewares ...Middleware) *httpRouter {
+func (r *HttpRouter) AddMiddleware(middlewares ...Middleware) *HttpRouter {
 	r.middlewares = append(r.middlewares, middlewares...)
 	return r
 }
 
-func (r *httpRouter) AddHttpMiddleware(middlewares ...HttpMiddleware) *httpRouter {
+func (r *HttpRouter) AddHttpMiddleware(middlewares ...HttpMiddleware) *HttpRouter {
 	r.httpMiddlewares = append(r.httpMiddlewares, middlewares...)
 	return r
 }
 
-func (r *httpRouter) Group(path string, middlewares ...HttpMiddleware) *httpRouter {
+func (r *HttpRouter) Group(path string, middlewares ...HttpMiddleware) *HttpRouter {
 	path = strings.Trim(path, "/")
 	if path == "" {
 		log.Println("group path cannot be empty")
@@ -71,20 +71,20 @@ func (r *httpRouter) Group(path string, middlewares ...HttpMiddleware) *httpRout
 	return router
 }
 
-func (r *httpRouter) AddRoute(route *HttpRoute, middlewares ...HttpMiddleware) *httpRouter {
+func (r *HttpRouter) AddRoute(route *HttpRoute, middlewares ...HttpMiddleware) *HttpRouter {
 	route.HttpMiddlewares = append(route.HttpMiddlewares, middlewares...)
 	r.routes = append(r.routes, route)
 	return r
 }
 
-func (r *httpRouter) AddRoutes(routes HttpRoutes, middlewares ...HttpMiddleware) *httpRouter {
+func (r *HttpRouter) AddRoutes(routes HttpRoutes, middlewares ...HttpMiddleware) *HttpRouter {
 	for _, route := range routes {
 		r.AddRoute(route)
 	}
 	r.AddHttpMiddleware(middlewares...)
 	return r
 }
-func (r *httpRouter) upMiddlewares() Middlewares {
+func (r *HttpRouter) upMiddlewares() Middlewares {
 	router := r
 	var middlewares Middlewares
 	for {
@@ -99,7 +99,7 @@ func (r *httpRouter) upMiddlewares() Middlewares {
 	return middlewares
 }
 
-func (r *httpRouter) upHttpMiddlewares() HttpMiddlewares {
+func (r *HttpRouter) upHttpMiddlewares() HttpMiddlewares {
 	router := r
 	var middlewares HttpMiddlewares
 	for {
@@ -114,7 +114,7 @@ func (r *httpRouter) upHttpMiddlewares() HttpMiddlewares {
 	return middlewares
 }
 
-func (r *httpRouter) setupRouter(httpSrv *httpServer, routes *HttpRoutes) (err error) {
+func (r *HttpRouter) setupRouter(httpSrv *httpServer, routes *HttpRoutes) (err error) {
 	upMiddlewares := r.upMiddlewares()
 	upHttpMiddlewares := r.upHttpMiddlewares()
 
