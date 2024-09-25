@@ -207,7 +207,7 @@ func (s *rpcServer) GetClientSourceCode(pkgName string) ([]byte, error) {
 			write("// %s", route.Describe)
 		}
 
-		write("func (s *Service) %s(at ark.At, in *%s) (out *%s, err error) {",
+		write("func (s *Service) %s(at *ark.At, in *%s) (out *%s, err error) {",
 			hInfo.Name,
 			in.Name,
 			out.Name,
