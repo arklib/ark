@@ -6,6 +6,7 @@ import (
 	hz "github.com/cloudwego/hertz/pkg/app"
 	_ "github.com/cloudwego/kitex/pkg/remote/codec/thrift"
 
+	"github.com/arklib/ark/auth"
 	"github.com/arklib/ark/errx"
 	"github.com/arklib/ark/http/result"
 	"github.com/arklib/ark/util"
@@ -76,8 +77,8 @@ func (proxy *ApiProxy) Handle(at *At, in, out any) (p *ApiPayload, err error) {
 
 func (proxy *ApiProxy) HttpHandler(ctx context.Context, reqCtx *hz.RequestContext) {
 	srv := proxy.Srv
-
 	in := proxy.NewInput()
+
 	// bind input
 	err := reqCtx.Bind(in)
 	if err != nil {
@@ -86,19 +87,23 @@ func (proxy *ApiProxy) HttpHandler(ctx context.Context, reqCtx *hz.RequestContex
 		return
 	}
 
+	// bind auth
+	data, ok := reqCtx.Get(auth.StoreAuthKey)
+	if ok {
+		err = util.BindStructFromMap(in, auth.StoreAuthKey, data.(auth.Payload))
+		if err != nil {
+			result.Error(reqCtx, auth.ErrAuthFailed)
+			return
+		}
+	}
+
 	// validate input
 	lang := string(reqCtx.GetHeader("Accept-Language"))
 	err = srv.Validator.Test(in, lang)
 	if err != nil {
 		result.Error(reqCtx, err)
+		return
 	}
-
-	// get user
-	// var user *auth.User
-	// authUser, ok := req.Get(auth.StoreUserKey)
-	// if ok {
-	// 	user = authUser.(*auth.User)
-	// }
 
 	// proxy handle
 	at := newAt(ctx, reqCtx, srv)

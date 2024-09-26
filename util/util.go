@@ -5,8 +5,9 @@ import (
 	"regexp"
 	"runtime"
 	"sort"
-	"strconv"
 	"strings"
+
+	"github.com/spf13/cast"
 )
 
 var fnNameRE = regexp.MustCompile(`\.(\w+)`)
@@ -34,18 +35,7 @@ func ForEachMapBySort[V any](in map[string]V, iteratee func(key string, value V)
 func MakeStrKey(keys ...any) string {
 	var newKeys = make([]string, len(keys))
 	for _, key := range keys {
-		switch k := key.(type) {
-		case string:
-			newKeys = append(newKeys, k)
-		case uint:
-		case uint8:
-		case uint16:
-		case uint32:
-		case uint64:
-			newKeys = append(newKeys, strconv.FormatUint(uint64(k), 10))
-		default:
-			return ""
-		}
+		newKeys = append(newKeys, cast.ToString(key))
 	}
 	return strings.Join(newKeys, ":")
 }

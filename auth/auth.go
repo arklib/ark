@@ -15,31 +15,29 @@ import (
 	"github.com/arklib/ark/http/result"
 )
 
-const StoreUserKey = "user"
+const StoreAuthKey = "auth"
 
 var ErrAuthFailed = errx.New("auth failed", 401)
 
-type Payload struct {
-	*jwt.RegisteredClaims
-}
+type Payload = jwt.MapClaims
 
 type Auth struct {
 	SecretKey []byte
-	Expires   time.Duration
-	// "header: Authorization, query: token, cookie: token"
+	Expire    int64
+	// example "header: Authorization, query: token, cookie: token"
 	TokenLookup map[string]string
 }
 
-func New(secretKey []byte, expires time.Duration, tokenLookup string) (auth *Auth, err error) {
+func New(secretKey string, expire int64, tokenLookup string) (*Auth, error) {
 	if len(secretKey) == 0 {
-		err = errx.Sprintf(
+		err := errx.Sprintf(
 			"please configure auth secretKey: %s",
 			NewAuthSecretKey())
-		return
+		return nil, err
 	}
-	auth = &Auth{
-		SecretKey:   secretKey,
-		Expires:     expires,
+	auth := &Auth{
+		SecretKey:   []byte(secretKey),
+		Expire:      expire,
 		TokenLookup: make(map[string]string),
 	}
 
@@ -53,39 +51,42 @@ func New(secretKey []byte, expires time.Duration, tokenLookup string) (auth *Aut
 		method, name := parts[0], parts[1]
 		auth.TokenLookup[method] = name
 	}
-	return
+	return auth, nil
 }
 
-func (auth *Auth) NewToken(data map[string]any) (string, error) {
-	expiresAt := time.Now().Add(auth.Expires)
-	payload := &Payload{
-		&jwt.RegisteredClaims{
-			ExpiresAt: jwt.NewNumericDate(expiresAt),
-		},
+func (auth *Auth) NewToken(scene string, payload Payload) (string, error) {
+	claims := make(jwt.MapClaims)
+	for key, value := range payload {
+		claims[key] = value
 	}
 
-	token := jwt.NewWithClaims(jwt.SigningMethodHS256, payload)
+	now := time.Now().Unix()
+	claims["exp"] = now + auth.Expire
+	claims["iat"] = now
+	claims["scene"] = scene
+
+	token := jwt.New(jwt.SigningMethodHS256)
+	token.Claims = claims
 	return token.SignedString(auth.SecretKey)
 }
 
-func (auth *Auth) ParseToken(signed string) (user *User, err error) {
-	payload := &Payload{}
+func (auth *Auth) ParseToken(signed string) (Payload, error) {
+	claims := make(jwt.MapClaims)
 	token, err := jwt.ParseWithClaims(
 		signed,
-		payload,
+		claims,
 		func(token *jwt.Token) (any, error) {
 			return auth.SecretKey, nil
 		},
 	)
 
 	if err != nil || !token.Valid {
-		err = ErrAuthFailed
+		return nil, ErrAuthFailed
 	}
-
-	return
+	return claims, nil
 }
 
-func (auth *Auth) HttpMiddleware(roles ...string) hz.HandlerFunc {
+func (auth *Auth) HttpMiddleware(scenes ...string) hz.HandlerFunc {
 	return func(ctx context.Context, req *hz.RequestContext) {
 		token, err := auth.FindHttpToken(req)
 		if err != nil {
@@ -93,18 +94,26 @@ func (auth *Auth) HttpMiddleware(roles ...string) hz.HandlerFunc {
 			return
 		}
 
-		user, err := auth.ParseToken(token)
-		if err != nil || !lo.Contains(roles, user.Role) {
-			result.Error(req, ErrAuthFailed)
+		payload, err := auth.ParseToken(token)
+		if err != nil {
+			result.Error(req, err)
 			return
 		}
 
-		req.Set(StoreUserKey, user)
+		if len(scenes) > 0 {
+			scene, ok := payload["scene"]
+			if !ok || !lo.Contains(scenes, scene.(string)) {
+				result.Error(req, ErrAuthFailed)
+				return
+			}
+		}
+		req.Set(StoreAuthKey, payload)
 		req.Next(ctx)
 	}
 }
 
-func (auth *Auth) FindHttpToken(req *hz.RequestContext) (token string, err error) {
+func (auth *Auth) FindHttpToken(req *hz.RequestContext) (string, error) {
+	token := ""
 	for method, name := range auth.TokenLookup {
 		switch method {
 		case "header":
@@ -119,12 +128,11 @@ func (auth *Auth) FindHttpToken(req *hz.RequestContext) (token string, err error
 		}
 
 		if len(token) > 0 {
-			return
+			return token, nil
 		}
 	}
 
-	err = ErrAuthFailed
-	return
+	return "", ErrAuthFailed
 }
 
 func NewAuthSecretKey() string {
