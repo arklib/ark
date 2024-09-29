@@ -7,7 +7,6 @@ import (
 	"github.com/spf13/cast"
 )
 
-// BindStructFromMap 从 map 中根据 ctx 标签绑定值到结构体
 func BindStructFromMap(input any, tagName string, data map[string]any) error {
 	valueOf := reflect.ValueOf(input).Elem()
 	typeOf := valueOf.Type()
@@ -34,7 +33,6 @@ func BindStructFromMap(input any, tagName string, data map[string]any) error {
 	return nil
 }
 
-// setFieldValue 根据值和字段类型设置结构体字段的值
 func setFieldValue(fieldValue reflect.Value, value any) error {
 	switch fieldValue.Kind() {
 	case reflect.String:
@@ -63,7 +61,6 @@ func setFieldValue(fieldValue reflect.Value, value any) error {
 	return nil
 }
 
-// setSliceFieldValue 设置切片类型的字段值
 func setSliceFieldValue(fieldValue reflect.Value, value any) error {
 	switch fieldValue.Type().Elem().Kind() {
 	case reflect.String:

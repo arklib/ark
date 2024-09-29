@@ -6,7 +6,7 @@ import (
 
 	"github.com/cloudwego/kitex/client"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
-	keService "github.com/cloudwego/kitex/pkg/serviceinfo"
+	kesvc "github.com/cloudwego/kitex/pkg/serviceinfo"
 	"github.com/cloudwego/kitex/transport"
 	"github.com/kitex-contrib/obs-opentelemetry/tracing"
 
@@ -15,7 +15,7 @@ import (
 	"github.com/arklib/ark/rpc"
 )
 
-var EmptyRPCMethodInfo = keService.NewMethodInfo(
+var EmptyRPCMethodInfo = kesvc.NewMethodInfo(
 	func(ctx context.Context, handler, in, out any) error { return nil },
 	func() any { return nil },
 	func() any { return nil },
@@ -23,7 +23,7 @@ var EmptyRPCMethodInfo = keService.NewMethodInfo(
 )
 
 type rpcService struct {
-	keSvc  *keService.ServiceInfo
+	keSvc  *kesvc.ServiceInfo
 	client client.Client
 }
 
@@ -84,10 +84,10 @@ func (c *rpcClient) init() error {
 			client.WithClientBasicInfo(basicInfo),
 		)
 
-		keSvc := &keService.ServiceInfo{
+		keSvc := &kesvc.ServiceInfo{
 			ServiceName:  name,
-			Methods:      make(map[string]keService.MethodInfo),
-			PayloadCodec: keService.Thrift,
+			Methods:      make(map[string]kesvc.MethodInfo),
+			PayloadCodec: kesvc.Thrift,
 		}
 
 		cli, err := client.NewClient(keSvc, cliOptions...)
@@ -107,7 +107,7 @@ func (c *rpcClient) init() error {
 func (c *rpcClient) Call(ctx context.Context, path string, in, out any) error {
 	paths := strings.SplitN(path, "/", 2)
 	if len(paths) != 2 {
-		return errx.New("service path error")
+		return errx.New("service Path error")
 	}
 	name, method := paths[0], paths[1]
 

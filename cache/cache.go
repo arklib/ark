@@ -12,20 +12,20 @@ import (
 var ErrKeyType = errors.New("key type error")
 
 type Driver interface {
-	Set(ctx context.Context, key string, value any, ttl time.Duration) error
-	Get(ctx context.Context, key string) (value []byte, err error)
+	Set(ctx context.Context, key string, data any, ttl time.Duration) error
+	Get(ctx context.Context, key string) (data []byte, err error)
 	Del(ctx context.Context, key string) error
 }
 
-type Cache[Value any] struct {
+type Cache[Data any] struct {
 	driver     Driver
 	scene      string
 	ttl        time.Duration
 	serializer serializer.Serializer
 }
 
-func New[Value any](driver Driver, scene string, ttl time.Duration) Cache[Value] {
-	return Cache[Value]{
+func New[Data any](driver Driver, scene string, ttl time.Duration) Cache[Data] {
+	return Cache[Data]{
 		driver:     driver,
 		scene:      scene,
 		ttl:        ttl * time.Second,
@@ -33,42 +33,42 @@ func New[Value any](driver Driver, scene string, ttl time.Duration) Cache[Value]
 	}
 }
 
-func (c Cache[Value]) WithSerializer(serialize serializer.Serializer) Cache[Value] {
+func (c Cache[Data]) WithSerializer(serialize serializer.Serializer) Cache[Data] {
 	c.serializer = serialize
 	return c
 }
 
-func (c Cache[Value]) Set(ctx context.Context, key any, value *Value) error {
+func (c Cache[Data]) Set(ctx context.Context, key any, data *Data) error {
 	newKey := util.MakeStrKey(c.scene, key)
 	if newKey == "" {
 		return ErrKeyType
 	}
 
-	newValue, err := c.serializer.Encode(value)
+	newData, err := c.serializer.Encode(data)
 	if err != nil {
 		return err
 	}
-	return c.driver.Set(ctx, newKey, newValue, c.ttl)
+	return c.driver.Set(ctx, newKey, newData, c.ttl)
 }
 
-func (c Cache[Value]) Get(ctx context.Context, key any) (value *Value, err error) {
+func (c Cache[Data]) Get(ctx context.Context, key any) (data *Data, err error) {
 	newKey := util.MakeStrKey(c.scene, key)
 	if newKey == "" {
 		err = ErrKeyType
 		return
 	}
 
-	data, err := c.driver.Get(ctx, newKey)
+	rawData, err := c.driver.Get(ctx, newKey)
 	if err != nil {
 		return
 	}
 
-	val := new(Value)
-	err = c.serializer.Decode(data, val)
-	return val, err
+	data = new(Data)
+	err = c.serializer.Decode(rawData, data)
+	return data, err
 }
 
-func (c Cache[Value]) Del(ctx context.Context, key any) error {
+func (c Cache[Data]) Del(ctx context.Context, key any) error {
 	newKey := util.MakeStrKey(c.scene, key)
 	if newKey == "" {
 		return ErrKeyType

@@ -1,14 +1,22 @@
-package codegen
+package gen
 
 import (
 	"fmt"
 	"reflect"
 	"strings"
+
+	"github.com/samber/lo"
+
+	"github.com/arklib/ark/util"
 )
 
 type Type struct {
 	pkg      *Package
 	rType    reflect.Type
+	isGen    bool
+	isRename bool
+	code     string
+
 	Key      string
 	Mod      string
 	PkgPath  string
@@ -16,22 +24,21 @@ type Type struct {
 	PkgName  string
 	RefName  string
 	Name     string
+	Prefix   string
 	FlatName string
-	isGen    bool
-	isRename bool
-	code     string
 }
 
-func newType(pkg *Package, rType reflect.Type) *Type {
+func newType(pkg *Package, rType reflect.Type, prefix string) *Type {
 	t := &Type{
 		pkg:     pkg,
 		rType:   rType,
-		Name:    rType.Name(),
 		PkgPath: rType.PkgPath(),
+		Name:    rType.Name(),
+		Prefix:  prefix,
 	}
 
 	if t.PkgPath != "" {
-		paths, name := ParsePkgPath(t.PkgPath)
+		paths, name := util.SplitSuffix(t.PkgPath, "/")
 		t.Mod = paths[0]
 		t.PkgPaths = paths
 		t.PkgName = name
@@ -39,10 +46,9 @@ func newType(pkg *Package, rType reflect.Type) *Type {
 		t.RefName = fmt.Sprintf("%s.%s", t.PkgName, t.Name)
 
 		switch {
-		case pkg.name == t.PkgName:
-			t.FlatName = t.Name
+		case t.PkgName == pkg.name:
+			t.FlatName = lo.PascalCase(t.Prefix) + t.Name
 		case t.Mod == pkg.mod:
-			// 都加上命名空间
 			t.FlatName = fmt.Sprintf("%s_%s", strings.ToUpper(t.PkgName), t.Name)
 			t.isRename = true
 		default:

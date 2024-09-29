@@ -39,3 +39,9 @@ func MakeStrKey(keys ...any) string {
 	}
 	return strings.Join(newKeys, ":")
 }
+
+func SplitSuffix(s, sep string) ([]string, string) {
+	paths := strings.Split(s, sep)
+	name := paths[len(paths)-1]
+	return paths, name
+}

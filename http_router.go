@@ -17,38 +17,38 @@ type (
 
 	HttpRoutes = []*HttpRoute
 	HttpRoute  struct {
+		Router          *HttpRouter
 		Title           string
 		Describe        string
 		Method          string
 		Path            string
 		Handler         *ApiProxy
-		Middlewares     Middlewares
+		ApiMiddlewares  ApiMiddlewares
 		HttpMiddlewares HttpMiddlewares
 		FullPath        string
 	}
+	HttpRouter struct {
+		parent          *HttpRouter
+		nodes           []*HttpRouter
+		routes          HttpRoutes
+		apiMiddlewares  ApiMiddlewares
+		httpMiddlewares HttpMiddlewares
+		Path            string
+		Title           string
+		Describe        string
+	}
 )
 
-type HttpRouter struct {
-	parent          *HttpRouter
-	nodes           []*HttpRouter
-	path            string
-	routes          HttpRoutes
-	middlewares     Middlewares
-	httpMiddlewares HttpMiddlewares
-	Title           string
-	Describe        string
-}
-
 func newHttpRouter(path string, r *HttpRouter) *HttpRouter {
-	return &HttpRouter{path: path, parent: r}
+	return &HttpRouter{Path: path, parent: r}
 }
 
-func (r *HttpRouter) AddMiddleware(middlewares ...Middleware) *HttpRouter {
-	r.middlewares = append(r.middlewares, middlewares...)
+func (r *HttpRouter) WithApiMiddleware(middlewares ...ApiMiddleware) *HttpRouter {
+	r.apiMiddlewares = append(r.apiMiddlewares, middlewares...)
 	return r
 }
 
-func (r *HttpRouter) AddHttpMiddleware(middlewares ...HttpMiddleware) *HttpRouter {
+func (r *HttpRouter) WithHttpMiddleware(middlewares ...HttpMiddleware) *HttpRouter {
 	r.httpMiddlewares = append(r.httpMiddlewares, middlewares...)
 	return r
 }
@@ -56,12 +56,12 @@ func (r *HttpRouter) AddHttpMiddleware(middlewares ...HttpMiddleware) *HttpRoute
 func (r *HttpRouter) Group(path string, middlewares ...HttpMiddleware) *HttpRouter {
 	path = strings.Trim(path, "/")
 	if path == "" {
-		log.Println("group path cannot be empty")
+		log.Println("group Path cannot be empty")
 		return nil
 	}
 
-	if r.path != "" {
-		path = fmt.Sprintf("%s/%s", r.path, path)
+	if r.Path != "" {
+		path = fmt.Sprintf("%s/%s", r.Path, path)
 	}
 
 	router := newHttpRouter(path, r)
@@ -71,8 +71,8 @@ func (r *HttpRouter) Group(path string, middlewares ...HttpMiddleware) *HttpRout
 	return router
 }
 
-func (r *HttpRouter) AddRoute(route *HttpRoute, middlewares ...HttpMiddleware) *HttpRouter {
-	route.HttpMiddlewares = append(route.HttpMiddlewares, middlewares...)
+func (r *HttpRouter) AddRoute(route *HttpRoute) *HttpRouter {
+	route.Router = r
 	r.routes = append(r.routes, route)
 	return r
 }
@@ -81,18 +81,18 @@ func (r *HttpRouter) AddRoutes(routes HttpRoutes, middlewares ...HttpMiddleware)
 	for _, route := range routes {
 		r.AddRoute(route)
 	}
-	r.AddHttpMiddleware(middlewares...)
+	r.WithHttpMiddleware(middlewares...)
 	return r
 }
-func (r *HttpRouter) upMiddlewares() Middlewares {
+func (r *HttpRouter) upApiMiddlewares() ApiMiddlewares {
 	router := r
-	var middlewares Middlewares
+	var middlewares ApiMiddlewares
 	for {
 		if router == nil {
 			break
 		}
-		if len(router.middlewares) > 0 {
-			middlewares = append(router.middlewares, middlewares...)
+		if len(router.apiMiddlewares) > 0 {
+			middlewares = append(router.apiMiddlewares, middlewares...)
 		}
 		router = router.parent
 	}
@@ -115,7 +115,7 @@ func (r *HttpRouter) upHttpMiddlewares() HttpMiddlewares {
 }
 
 func (r *HttpRouter) setupRouter(httpSrv *httpServer, routes *HttpRoutes) (err error) {
-	upMiddlewares := r.upMiddlewares()
+	upApiMiddlewares := r.upApiMiddlewares()
 	upHttpMiddlewares := r.upHttpMiddlewares()
 
 	for _, route := range r.routes {
@@ -129,11 +129,11 @@ func (r *HttpRouter) setupRouter(httpSrv *httpServer, routes *HttpRoutes) (err e
 			route.Method = "POST"
 		}
 
-		// route full path
-		if r.path == "" {
+		// route full Path
+		if r.Path == "" {
 			route.FullPath = route.Path
 		} else {
-			route.FullPath = fmt.Sprintf("%s/%s", r.path, route.Path)
+			route.FullPath = fmt.Sprintf("%s/%s", r.Path, route.Path)
 		}
 
 		// add route to routes
@@ -147,11 +147,11 @@ func (r *HttpRouter) setupRouter(httpSrv *httpServer, routes *HttpRoutes) (err e
 		// up httpMiddlewares + route.httpMiddlewares
 		route.HttpMiddlewares = append(upHttpMiddlewares, route.HttpMiddlewares...)
 
-		// up api httpMiddlewares + route.middlewares
-		route.Middlewares = append(upMiddlewares, route.Middlewares...)
+		// up apiMiddlewares + route.apiMiddlewares
+		route.ApiMiddlewares = append(upApiMiddlewares, route.ApiMiddlewares...)
 
 		// add api.proxy httpMiddlewares
-		apiProxy.Use(route.Middlewares...)
+		apiProxy.Use(route.ApiMiddlewares...)
 
 		// httpMiddlewares + apiProxy.HttpHandler
 		handlers := append(route.HttpMiddlewares, apiProxy.HttpHandler)

@@ -1,4 +1,4 @@
-package codegen
+package gen
 
 import (
 	"fmt"
@@ -29,6 +29,10 @@ func NewPackage(name string) *Package {
 }
 
 func (p *Package) loadType(rType reflect.Type) (t *Type) {
+	return p.loadTypeWithPrefix(rType, "")
+}
+
+func (p *Package) loadTypeWithPrefix(rType reflect.Type, prefix string) (t *Type) {
 	if rType.PkgPath() == "" {
 		return
 	}
@@ -36,7 +40,7 @@ func (p *Package) loadType(rType reflect.Type) (t *Type) {
 	id := fmt.Sprintf("%s.%s", rType.PkgPath(), rType.Name())
 	t, ok := p.types[id]
 	if !ok {
-		t = newType(p, rType)
+		t = newType(p, rType, prefix)
 		p.types[id] = t
 		t.GenCode()
 	}
@@ -51,7 +55,7 @@ func (p *Package) GetTypes() Types {
 	return p.types
 }
 
-func (p *Package) AddStruct(val any) (t *Type) {
+func (p *Package) AddStruct(val any, prefix string) (t *Type) {
 	rType := reflect.TypeOf(val)
 	for {
 		if rType.Kind() != reflect.Ptr {
@@ -61,14 +65,13 @@ func (p *Package) AddStruct(val any) (t *Type) {
 	}
 
 	pkgPath := rType.PkgPath()
-
 	if p.mod == "" {
-		paths, name := ParsePkgPath(pkgPath)
+		paths, name := util.SplitSuffix(pkgPath, "/")
 		p.mod = paths[0]
 		p.name = name
 	}
 
-	t = p.loadType(rType)
+	t = p.loadTypeWithPrefix(rType, prefix)
 	p.structs[t.Key] = t
 	return
 }
@@ -95,10 +98,4 @@ func (p *Package) Source() string {
 
 func (p *Package) Dump() {
 	fmt.Println(p.Source())
-}
-
-func ParsePkgPath(path string) ([]string, string) {
-	paths := strings.Split(path, "/")
-	name := paths[len(paths)-1]
-	return paths, name
 }

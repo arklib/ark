@@ -13,8 +13,8 @@ import (
 )
 
 type (
-	Middlewares []Middleware
-	Middleware  func(*ApiPayload) error
+	ApiMiddlewares []ApiMiddleware
+	ApiMiddleware  func(*ApiPayload) error
 
 	ApiPayload struct {
 		At   *At
@@ -25,14 +25,15 @@ type (
 	}
 
 	ApiProxy struct {
-		Srv         *Server
-		Path        string
+		Srv  *Server
+		Path string
+
 		Name        string
 		NewInput    func() any
 		NewOutput   func() any
 		BaseHandler func(*At, any) (any, error)
 		setOutput   func(dst any, src any)
-		middlewares Middlewares
+		middlewares ApiMiddlewares
 	}
 )
 
@@ -50,7 +51,7 @@ func ApiHandler[In, Out any](handler func(*At, *In) (*Out, error)) *ApiProxy {
 	}
 }
 
-func (proxy *ApiProxy) Use(middlewares ...Middleware) {
+func (proxy *ApiProxy) Use(middlewares ...ApiMiddleware) {
 	proxy.middlewares = append(proxy.middlewares, middlewares...)
 }
 

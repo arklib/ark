@@ -12,8 +12,8 @@ var ErrKeyType = errors.New("key type error")
 var ErrIsLocked = errors.New("is locked")
 
 type Driver interface {
-	Set(ctx context.Context, key string, value any, ttl time.Duration) (bool, error)
-	Del(ctx context.Context, key string) error
+	Lock(ctx context.Context, key string, ttl time.Duration) (bool, error)
+	Free(ctx context.Context, key string) error
 }
 
 type Locked struct {
@@ -36,14 +36,14 @@ func New(driver Driver, scene string, ttl time.Duration) *Lock {
 	}
 }
 
-func (l *Lock) Apply(ctx context.Context, key any) (locked *Locked, err error) {
+func (l *Lock) Lock(ctx context.Context, key any) (locked *Locked, err error) {
 	newKey := util.MakeStrKey(l.scene, key)
 	if newKey == "" {
 		err = ErrKeyType
 		return
 	}
 
-	lock, err := l.driver.Set(ctx, newKey, 1, l.ttl)
+	lock, err := l.driver.Lock(ctx, newKey, l.ttl)
 	if err != nil {
 		return
 	}
@@ -51,6 +51,7 @@ func (l *Lock) Apply(ctx context.Context, key any) (locked *Locked, err error) {
 		err = ErrIsLocked
 		return
 	}
+
 	locked = &Locked{
 		ctx:    ctx,
 		driver: l.driver,
@@ -59,6 +60,6 @@ func (l *Lock) Apply(ctx context.Context, key any) (locked *Locked, err error) {
 	return
 }
 
-func (l *Locked) Release() error {
-	return l.driver.Del(l.ctx, l.key)
+func (l *Locked) Free() error {
+	return l.driver.Free(l.ctx, l.key)
 }

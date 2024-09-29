@@ -13,11 +13,14 @@ import (
 	kesrv "github.com/cloudwego/kitex/server"
 	"github.com/kitex-contrib/obs-opentelemetry/tracing"
 
-	"github.com/arklib/ark/codegen"
+	"github.com/samber/lo"
+
 	"github.com/arklib/ark/errx"
+	"github.com/arklib/ark/gen"
 	"github.com/arklib/ark/logger"
 	"github.com/arklib/ark/registry"
 	"github.com/arklib/ark/rpc"
+	"github.com/arklib/ark/util"
 )
 
 // Logger
@@ -135,18 +138,18 @@ func (s *rpcServer) init() error {
 
 	// recovery
 	if config.UseRecovery {
-		s.AddMiddleware(s.UseRecovery())
+		s.WithApiMiddleware(s.UseRecovery())
 	}
 
 	// validate
 	if config.UseValidate {
-		s.AddMiddleware(s.UseValidate())
+		s.WithApiMiddleware(s.UseValidate())
 	}
 
 	return nil
 }
 
-func (s *rpcServer) UseRecovery() Middleware {
+func (s *rpcServer) UseRecovery() ApiMiddleware {
 	return func(p *ApiPayload) (err error) {
 		defer func() {
 			if val := recover(); val != nil {
@@ -158,7 +161,7 @@ func (s *rpcServer) UseRecovery() Middleware {
 	}
 }
 
-func (s *rpcServer) UseValidate() Middleware {
+func (s *rpcServer) UseValidate() ApiMiddleware {
 	return func(p *ApiPayload) error {
 		err := s.srv.Validator.Test(p.In, "")
 		if err != nil {
@@ -172,11 +175,11 @@ func (s *rpcServer) KeServer() kesrv.Server {
 	return s.keSrv
 }
 
-func (s *rpcServer) GetClientSourceCode(pkgName string) ([]byte, error) {
+func (s *rpcServer) BuildClientCode(pkgName string) ([]byte, error) {
 	config := s.srv.config.RPCServer
 
 	// pkg code
-	pkg := codegen.NewPackage(pkgName)
+	pkg := gen.NewPackage(pkgName)
 	pkg.AddImport("github.com/arklib/ark")
 
 	code := ""
@@ -193,9 +196,11 @@ func (s *rpcServer) GetClientSourceCode(pkgName string) ([]byte, error) {
 	write("}\n")
 
 	for _, route := range s.Routes {
+		_, prefix := util.SplitSuffix(route.Router.Path, "/")
+
 		hInfo := route.Handler
-		in := pkg.AddStruct(hInfo.NewInput())
-		out := pkg.AddStruct(hInfo.NewOutput())
+		in := pkg.AddStruct(hInfo.NewInput(), prefix)
+		out := pkg.AddStruct(hInfo.NewOutput(), prefix)
 
 		// comment: title
 		if route.Title != "" {
@@ -208,11 +213,11 @@ func (s *rpcServer) GetClientSourceCode(pkgName string) ([]byte, error) {
 		}
 
 		write("func (s *Service) %s(at *ark.At, in *%s) (out *%s, err error) {",
-			hInfo.Name,
-			in.Name,
-			out.Name,
+			lo.PascalCase(prefix+hInfo.Name),
+			in.FlatName,
+			out.FlatName,
 		)
-		write("    out = new(%s)", out.Name)
+		write("    out = new(%s)", out.FlatName)
 		write(`    err = s.srv.RPC(at, "%s/%s", in, out)`, config.Name, route.FullPath)
 		write("    return")
 		write("}\n")
@@ -234,15 +239,15 @@ func (s *rpcServer) genCode() error {
 	}
 
 	// client code
-	_, pkgName := codegen.ParsePkgPath(config.Output)
-	code, err := s.GetClientSourceCode(pkgName)
+	_, pkgName := util.SplitSuffix(config.Output, "/")
+	code, err := s.BuildClientCode(pkgName)
 	if err != nil {
 		return err
 	}
 
 	// output code file
 	codeFile := fmt.Sprintf("%s/%s.go", config.Output, pkgName)
-	return os.WriteFile(codeFile, code, 0444)
+	return os.WriteFile(codeFile, code, 0666)
 }
 
 func (s *rpcServer) GetRoutes() RPCRoutes {
