@@ -16,11 +16,11 @@ func NewRedisDriver(client redis.Cmdable) *RedisDriver {
 	return &RedisDriver{client: client}
 }
 
-func (r *RedisDriver) Set(ctx context.Context, key string, value any, ttl time.Duration) error {
-	return r.client.Set(ctx, key, value, ttl).Err()
+func (r *RedisDriver) Set(ctx context.Context, key string, data []byte, ttl time.Duration) error {
+	return r.client.Set(ctx, key, data, ttl).Err()
 }
 
-func (r *RedisDriver) Get(ctx context.Context, key string) (value []byte, err error) {
+func (r *RedisDriver) Get(ctx context.Context, key string) (data []byte, err error) {
 	return r.client.Get(ctx, key).Bytes()
 }
 

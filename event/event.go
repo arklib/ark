@@ -10,12 +10,13 @@ type (
 		Data *Data
 		Next func() error
 	}
+
 	Event[Data any] struct {
 		handlers []func(Payload[Data]) error
 	}
 )
 
-func New[Data any]() *Event[Data] {
+func Define[Data any]() *Event[Data] {
 	return &Event[Data]{}
 }
 

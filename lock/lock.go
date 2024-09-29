@@ -11,32 +11,40 @@ import (
 var ErrKeyType = errors.New("key type error")
 var ErrIsLocked = errors.New("is locked")
 
-type Driver interface {
-	Lock(ctx context.Context, key string, ttl time.Duration) (bool, error)
-	Free(ctx context.Context, key string) error
-}
+type (
+	Driver interface {
+		Lock(ctx context.Context, key string, ttl time.Duration) (bool, error)
+		Free(ctx context.Context, key string) error
+	}
 
-type Locked struct {
-	driver Driver
-	key    string
-	ctx    context.Context
-}
+	Config struct {
+		Driver Driver
+		Scene  string
+		TTL    uint
+	}
 
-type Lock struct {
-	driver Driver
-	scene  string
-	ttl    time.Duration
-}
+	Payload struct {
+		driver Driver
+		key    string
+		ctx    context.Context
+	}
 
-func New(driver Driver, scene string, ttl time.Duration) *Lock {
+	Lock struct {
+		driver Driver
+		scene  string
+		ttl    time.Duration
+	}
+)
+
+func Define(c Config) *Lock {
 	return &Lock{
-		driver: driver,
-		scene:  scene,
-		ttl:    ttl,
+		driver: c.Driver,
+		scene:  c.Scene,
+		ttl:    time.Duration(c.TTL) * time.Second,
 	}
 }
 
-func (l *Lock) Lock(ctx context.Context, key any) (locked *Locked, err error) {
+func (l *Lock) Lock(ctx context.Context, key any) (payload *Payload, err error) {
 	newKey := util.MakeStrKey(l.scene, key)
 	if newKey == "" {
 		err = ErrKeyType
@@ -52,7 +60,7 @@ func (l *Lock) Lock(ctx context.Context, key any) (locked *Locked, err error) {
 		return
 	}
 
-	locked = &Locked{
+	payload = &Payload{
 		ctx:    ctx,
 		driver: l.driver,
 		key:    newKey,
@@ -60,6 +68,6 @@ func (l *Lock) Lock(ctx context.Context, key any) (locked *Locked, err error) {
 	return
 }
 
-func (l *Locked) Free() error {
-	return l.driver.Free(l.ctx, l.key)
+func (p *Payload) Free() error {
+	return p.driver.Free(p.ctx, p.key)
 }

@@ -11,31 +11,39 @@ import (
 
 var ErrKeyType = errors.New("key type error")
 
-type Driver interface {
-	Set(ctx context.Context, key string, data any, ttl time.Duration) error
-	Get(ctx context.Context, key string) (data []byte, err error)
-	Del(ctx context.Context, key string) error
-}
-
-type Cache[Data any] struct {
-	driver     Driver
-	scene      string
-	ttl        time.Duration
-	serializer serializer.Serializer
-}
-
-func New[Data any](driver Driver, scene string, ttl time.Duration) Cache[Data] {
-	return Cache[Data]{
-		driver:     driver,
-		scene:      scene,
-		ttl:        ttl * time.Second,
-		serializer: serializer.NewGoJson(),
+type (
+	Driver interface {
+		Set(ctx context.Context, key string, data []byte, ttl time.Duration) error
+		Get(ctx context.Context, key string) (data []byte, err error)
+		Del(ctx context.Context, key string) error
 	}
-}
 
-func (c Cache[Data]) WithSerializer(serialize serializer.Serializer) Cache[Data] {
-	c.serializer = serialize
-	return c
+	Config struct {
+		Driver     Driver
+		Serializer serializer.Serializer
+		Scene      string
+		TTL        uint
+	}
+
+	Cache[Data any] struct {
+		driver     Driver
+		serializer serializer.Serializer
+		scene      string
+		ttl        time.Duration
+	}
+)
+
+func Define[Data any](c Config) Cache[Data] {
+	if c.Serializer == nil {
+		c.Serializer = serializer.NewGoJson()
+	}
+
+	return Cache[Data]{
+		driver:     c.Driver,
+		serializer: c.Serializer,
+		scene:      c.Scene,
+		ttl:        time.Duration(c.TTL) * time.Second,
+	}
 }
 
 func (c Cache[Data]) Set(ctx context.Context, key any, data *Data) error {

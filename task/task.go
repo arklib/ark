@@ -2,53 +2,67 @@ package task
 
 import (
 	"context"
-	"encoding/json"
 	"time"
+
+	"github.com/arklib/ark/serializer"
 )
 
-type Driver interface {
-	Pop(ctx context.Context, queue string) (data []byte, err error)
-	Push(ctx context.Context, queue string, data any) error
-}
-
 type (
+	Driver interface {
+		Pop(ctx context.Context, queue string) (data []byte, err error)
+		Push(ctx context.Context, queue string, data any) error
+	}
+
+	Config struct {
+		Driver     Driver
+		Serializer serializer.Serializer
+		Queue      string
+		Timeout    uint
+	}
+
 	Payload[Data any] struct {
 		Ctx  context.Context
 		Data *Data
 	}
 
 	Task[Data any] struct {
-		driver  Driver
-		Name    string
-		Timeout time.Duration
-		Handler func(Payload[Data]) error
+		driver     Driver
+		serializer serializer.Serializer
+		queue      string
+		timeout    time.Duration
+		handler    func(Payload[Data]) error
 	}
 )
 
-func New[Data any](driver Driver, name string, timeout time.Duration) Task[Data] {
+func Define[Data any](c Config) Task[Data] {
+	if c.Serializer == nil {
+		c.Serializer = serializer.NewGoJson()
+	}
+
 	return Task[Data]{
-		driver:  driver,
-		Name:    name,
-		Timeout: timeout,
+		driver:     c.Driver,
+		serializer: c.Serializer,
+		queue:      c.Queue,
+		timeout:    time.Duration(c.Timeout) * time.Second,
 	}
 }
 
 func (t *Task[Data]) Execute() error {
 	ctx := context.Background()
 	for {
-		rawData, err := t.driver.Pop(ctx, t.Name)
+		rawData, err := t.driver.Pop(ctx, t.queue)
 		if err != nil {
 			return err
 		}
 
 		data := new(Data)
-		err = json.Unmarshal(rawData, data)
+		err = t.serializer.Decode(rawData, data)
 		if err != nil {
 			return err
 		}
 
 		payload := Payload[Data]{Ctx: ctx, Data: data}
-		err = t.Handler(payload)
+		err = t.handler(payload)
 		if err != nil {
 			return err
 		}
@@ -56,13 +70,13 @@ func (t *Task[Data]) Execute() error {
 }
 
 func (t *Task[Data]) Push(ctx context.Context, data Data) error {
-	rawData, err := json.Marshal(data)
+	rawData, err := t.serializer.Encode(data)
 	if err != nil {
 		return err
 	}
-	return t.driver.Push(ctx, t.Name, rawData)
+	return t.driver.Push(ctx, t.queue, rawData)
 }
 
 func (t *Task[Data]) With(handler func(Payload[Data]) error) {
-	t.Handler = handler
+	t.handler = handler
 }
