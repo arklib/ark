@@ -16,7 +16,7 @@ func New() *Task {
 	}
 }
 
-func (t *Task) Register(name string, handler func() error) {
+func (t *Task) Define(name string, handler func() error) {
 	t.list[name] = handler
 }
 

@@ -15,8 +15,8 @@ import (
 
 	"github.com/samber/lo"
 
+	"github.com/arklib/ark/codegen"
 	"github.com/arklib/ark/errx"
-	"github.com/arklib/ark/gen"
 	"github.com/arklib/ark/logger"
 	"github.com/arklib/ark/registry"
 	"github.com/arklib/ark/rpc"
@@ -179,7 +179,7 @@ func (s *rpcServer) BuildClientCode(pkgName string) ([]byte, error) {
 	config := s.srv.config.RPCServer
 
 	// pkg code
-	pkg := gen.NewPackage(pkgName)
+	pkg := codegen.NewPackage(pkgName)
 	pkg.AddImport("github.com/arklib/ark")
 
 	code := ""
