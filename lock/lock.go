@@ -14,7 +14,7 @@ var ErrIsLocked = errors.New("is locked")
 type (
 	Driver interface {
 		Lock(ctx context.Context, key string, ttl time.Duration) (bool, error)
-		Free(ctx context.Context, key string) error
+		Unlock(ctx context.Context, key string) error
 	}
 
 	Config struct {
@@ -68,6 +68,6 @@ func (l *Lock) Lock(ctx context.Context, key any) (payload *Payload, err error) 
 	return
 }
 
-func (p *Payload) Free() error {
-	return p.driver.Free(p.ctx, p.key)
+func (p *Payload) Unlock() error {
+	return p.driver.Unlock(p.ctx, p.key)
 }

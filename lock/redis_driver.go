@@ -20,6 +20,6 @@ func (r *RedisDriver) Lock(ctx context.Context, key string, ttl time.Duration) (
 	return r.client.SetNX(ctx, key, 1, ttl).Result()
 }
 
-func (r *RedisDriver) Free(ctx context.Context, key string) error {
+func (r *RedisDriver) Unlock(ctx context.Context, key string) error {
 	return r.client.Del(ctx, key).Err()
 }
