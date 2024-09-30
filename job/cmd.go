@@ -58,7 +58,11 @@ func Run(jobs any, queues []string) {
 	}
 
 	for _, job := range GetListByFilter(jobs, queues) {
-		go job.Run()
+		go func() {
+			if err := job.Run(); err != nil {
+				log.Print(err)
+			}
+		}()
 	}
 	select {}
 }
@@ -72,8 +76,7 @@ func RunRetry(jobs any, queues []string) {
 	jobList := GetListByFilter(jobs, queues)
 	for {
 		for _, job := range jobList {
-			err := job.Retry()
-			if err != nil {
+			if err := job.Retry(); err != nil {
 				log.Printf("[job.retry] queue: %s, error: %s\n", job.Queue, err.Error())
 				continue
 			}

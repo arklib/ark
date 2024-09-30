@@ -29,6 +29,14 @@ func NewDBRetryDriver(db *gorm.DB) *DBRetryDriver {
 	return &DBRetryDriver{db: db}
 }
 
+func (r *DBRetryDriver) Init() error {
+	hasTable := r.db.Migrator().HasTable("job_retry")
+	if !hasTable {
+		return r.db.AutoMigrate(&JobRetry{})
+	}
+	return nil
+}
+
 func (r *DBRetryDriver) Add(queue string, data []byte, retryTime uint, errMsg string) error {
 	second := time.Duration(retryTime) * time.Second
 	job := &JobRetry{
@@ -40,7 +48,7 @@ func (r *DBRetryDriver) Add(queue string, data []byte, retryTime uint, errMsg st
 	return r.db.Create(job).Error
 }
 
-func (r *DBRetryDriver) Run(queue string, push PushFn) error {
+func (r *DBRetryDriver) Run(queue string, push PushCallback) error {
 	page := 1
 	for {
 		var jobs []JobRetry

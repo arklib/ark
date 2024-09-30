@@ -9,7 +9,7 @@ import (
 )
 
 type (
-	PushFn func(id string, data []byte) error
+	PushCallback func(id string, data []byte) error
 
 	Driver interface {
 		Pop(ctx context.Context, queue string) (rawData []byte, err error)
@@ -18,8 +18,9 @@ type (
 	}
 
 	RetryDriver interface {
+		Init() error
 		Add(queue string, rawData []byte, retryTime uint, errMsg string) error
-		Run(queue string, push PushFn) error
+		Run(queue string, push PushCallback) error
 	}
 
 	Config struct {
@@ -50,7 +51,7 @@ type (
 
 	Cmd struct {
 		Queue string
-		Run   func()
+		Run   func() error
 		Retry func() error
 	}
 )
@@ -94,7 +95,11 @@ func (t *Job[Data]) Dispatch(ctx context.Context, data Data) error {
 	return t.driver.Push(ctx, t.queue, rawData)
 }
 
-func (t *Job[Data]) Run() {
+func (t *Job[Data]) Run() error {
+	if err := t.retryDriver.Init(); err != nil {
+		return err
+	}
+
 	ctx := context.Background()
 	for {
 		rawData, err := t.driver.Pop(ctx, t.queue)
@@ -128,9 +133,14 @@ func (t *Job[Data]) Run() {
 }
 
 func (t *Job[Data]) Retry() error {
+	if err := t.retryDriver.Init(); err != nil {
+		return err
+	}
+
 	ctx := context.Background()
-	return t.retryDriver.Run(t.queue, func(id string, data []byte) error {
+	push := func(id string, data []byte) error {
 		log.Printf("[job.retry] jobId: %s, queue: %s\n", id, t.queue)
 		return t.driver.Push(ctx, t.queue, data)
-	})
+	}
+	return t.retryDriver.Run(t.queue, push)
 }
