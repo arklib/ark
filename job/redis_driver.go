@@ -1,7 +1,8 @@
-package task
+package job
 
 import (
 	"context"
+	"errors"
 
 	"github.com/redis/go-redis/v9"
 )
@@ -15,10 +16,14 @@ func NewRedisDriver(client redis.Cmdable) *RedisDriver {
 	return &RedisDriver{client: client}
 }
 
-func (r *RedisDriver) Push(ctx context.Context, queue string, data any) error {
+func (r *RedisDriver) Push(ctx context.Context, queue string, data []byte) error {
 	return r.client.LPush(ctx, queue, data).Err()
 }
 
 func (r *RedisDriver) Pop(ctx context.Context, queue string) ([]byte, error) {
-	return r.client.LPop(ctx, queue).Bytes()
+	result, err := r.client.LPop(ctx, queue).Bytes()
+	if errors.Is(err, redis.Nil) {
+		return result, nil
+	}
+	return result, err
 }

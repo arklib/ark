@@ -20,11 +20,11 @@ func Define[Data any]() *Event[Data] {
 	return &Event[Data]{}
 }
 
-func (e Event[Data]) Add(handler ...func(Payload[Data]) error) {
+func (e Event[Data]) Use(handler ...func(Payload[Data]) error) {
 	e.handlers = append(e.handlers, handler...)
 }
 
-func (e Event[Data]) Emit(ctx context.Context, data *Data) error {
+func (e Event[Data]) Dispatch(ctx context.Context, data *Data) error {
 	p := Payload[Data]{
 		Ctx:  ctx,
 		Data: data,

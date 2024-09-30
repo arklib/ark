@@ -11,6 +11,7 @@ import (
 	"github.com/arklib/ark/config"
 	"github.com/arklib/ark/logger"
 	"github.com/arklib/ark/registry"
+	"github.com/arklib/ark/task"
 	"github.com/arklib/ark/validator"
 )
 
@@ -63,6 +64,7 @@ type Server struct {
 	config     *ServerConfig
 	Mode       string
 	Config     *config.Config
+	Task       *task.Task
 	Logger     *logger.Logger
 	Validator  *validator.Validator
 	HttpServer *httpServer
@@ -103,6 +105,9 @@ func (srv *Server) init() (err error) {
 	} else {
 		srv.Logger = logger.New(sc.Logger)
 	}
+
+	// task
+	srv.Task = task.New()
 
 	// validator
 	srv.Validator = validator.New(sc.Lang)

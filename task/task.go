@@ -1,82 +1,59 @@
 package task
 
 import (
-	"context"
+	"fmt"
+	"log"
 	"time"
-
-	"github.com/arklib/ark/serializer"
 )
 
-type (
-	Driver interface {
-		Pop(ctx context.Context, queue string) (data []byte, err error)
-		Push(ctx context.Context, queue string, data any) error
-	}
+type Task struct {
+	list map[string]func() error
+}
 
-	Config struct {
-		Driver     Driver
-		Serializer serializer.Serializer
-		Queue      string
-		Timeout    uint
-	}
-
-	Payload[Data any] struct {
-		Ctx  context.Context
-		Data *Data
-	}
-
-	Task[Data any] struct {
-		driver     Driver
-		serializer serializer.Serializer
-		queue      string
-		timeout    time.Duration
-		handler    func(Payload[Data]) error
-	}
-)
-
-func Define[Data any](c Config) Task[Data] {
-	if c.Serializer == nil {
-		c.Serializer = serializer.NewGoJson()
-	}
-
-	return Task[Data]{
-		driver:     c.Driver,
-		serializer: c.Serializer,
-		queue:      c.Queue,
-		timeout:    time.Duration(c.Timeout) * time.Second,
+func New() *Task {
+	return &Task{
+		map[string]func() error{},
 	}
 }
 
-func (t *Task[Data]) Execute() error {
-	ctx := context.Background()
-	for {
-		rawData, err := t.driver.Pop(ctx, t.queue)
-		if err != nil {
-			return err
-		}
+func (t *Task) Register(name string, handler func() error) {
+	t.list[name] = handler
+}
 
-		data := new(Data)
-		err = t.serializer.Decode(rawData, data)
-		if err != nil {
-			return err
-		}
+func (t *Task) GetList() []string {
+	var names []string
+	for k := range t.list {
+		names = append(names, k)
+	}
+	return names
+}
 
-		payload := Payload[Data]{Ctx: ctx, Data: data}
-		err = t.handler(payload)
-		if err != nil {
-			return err
-		}
+func (t *Task) PrintList() {
+	fmt.Println("tasks:")
+	for _, name := range t.GetList() {
+		fmt.Printf("* %s\n", name)
 	}
 }
 
-func (t *Task[Data]) Push(ctx context.Context, data Data) error {
-	rawData, err := t.serializer.Encode(data)
+func (t *Task) Run(args []string) {
+	if len(args) == 0 {
+		t.PrintList()
+		return
+	}
+
+	name := args[0]
+	handler, ok := t.list[name]
+	if !ok {
+		log.Printf("[task] '%s', error: 'not found'\n", name)
+		return
+	}
+
+	start := time.Now()
+	err := handler()
+	elapsed := time.Since(start)
 	if err != nil {
-		return err
+		log.Printf("[task] '%s', elapsed: %v, error: '%s'\n", name, elapsed, err)
+		return
 	}
-	return t.driver.Push(ctx, t.queue, rawData)
-}
-
-func (t *Task[Data]) With(handler func(Payload[Data]) error) {
-	t.handler = handler
+	log.Printf("[task] '%s', elapsed: %v", name, elapsed)
 }
