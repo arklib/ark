@@ -17,7 +17,7 @@ type (
 	ApiMiddleware  func(*ApiPayload) error
 
 	ApiPayload struct {
-		At   *At
+		Ctx  *Ctx
 		Path string
 		In   any
 		Out  any
@@ -31,19 +31,19 @@ type (
 		Name        string
 		NewInput    func() any
 		NewOutput   func() any
-		BaseHandler func(*At, any) (any, error)
+		BaseHandler func(*Ctx, any) (any, error)
 		setOutput   func(dst any, src any)
 		middlewares ApiMiddlewares
 	}
 )
 
-func ApiHandler[In, Out any](handler func(*At, *In) (*Out, error)) *ApiProxy {
+func ApiHandler[In, Out any](handler func(*Ctx, *In) (*Out, error)) *ApiProxy {
 	return &ApiProxy{
 		Name:      util.GetFnName(handler),
 		NewInput:  func() any { return new(In) },
 		NewOutput: func() any { return new(Out) },
-		BaseHandler: func(at *At, in any) (any, error) {
-			return handler(at, in.(*In))
+		BaseHandler: func(c *Ctx, in any) (any, error) {
+			return handler(c, in.(*In))
 		},
 		setOutput: func(val any, newVal any) {
 			*val.(*Out) = *newVal.(*Out)
@@ -55,9 +55,9 @@ func (proxy *ApiProxy) Use(middlewares ...ApiMiddleware) {
 	proxy.middlewares = append(proxy.middlewares, middlewares...)
 }
 
-func (proxy *ApiProxy) Handle(at *At, in, out any) (p *ApiPayload, err error) {
+func (proxy *ApiProxy) Handle(c *Ctx, in, out any) (p *ApiPayload, err error) {
 	p = &ApiPayload{
-		At:   at,
+		Ctx:  c,
 		Path: proxy.Path,
 		In:   in,
 		Out:  out,
@@ -66,7 +66,7 @@ func (proxy *ApiProxy) Handle(at *At, in, out any) (p *ApiPayload, err error) {
 	index := 0
 	p.Next = func() error {
 		if index == len(proxy.middlewares) {
-			p.Out, err = proxy.BaseHandler(at, in)
+			p.Out, err = proxy.BaseHandler(c, in)
 			return err
 		}
 		fn := proxy.middlewares[index]
@@ -107,8 +107,8 @@ func (proxy *ApiProxy) HttpHandler(ctx context.Context, reqCtx *hz.RequestContex
 	}
 
 	// proxy handle
-	at := newAt(ctx, reqCtx, srv)
-	payload, err := proxy.Handle(at, in, proxy.NewOutput())
+	c := newCtx(ctx, reqCtx, srv)
+	payload, err := proxy.Handle(c, in, proxy.NewOutput())
 	if err != nil {
 		result.Error(reqCtx, err)
 		return
@@ -118,9 +118,9 @@ func (proxy *ApiProxy) HttpHandler(ctx context.Context, reqCtx *hz.RequestContex
 
 func (proxy *ApiProxy) RPCHandler(ctx context.Context, _, in, out any) error {
 	srv := proxy.Srv
-	at := newAt(ctx, srv, nil)
+	c := newCtx(ctx, srv, nil)
 
-	payload, err := proxy.Handle(at, in, out)
+	payload, err := proxy.Handle(c, in, out)
 	if err != nil {
 		return err
 	}

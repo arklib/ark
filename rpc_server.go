@@ -212,13 +212,13 @@ func (s *rpcServer) BuildClientCode(pkgName string) ([]byte, error) {
 			write("// %s", route.Describe)
 		}
 
-		write("func (s *Service) %s(at *ark.At, in *%s) (out *%s, err error) {",
+		write("func (s *Service) %s(ctx *ark.Ctx, in *%s) (out *%s, err error) {",
 			lo.PascalCase(prefix+hInfo.Name),
 			in.FlatName,
 			out.FlatName,
 		)
 		write("    out = new(%s)", out.FlatName)
-		write(`    err = s.srv.RPC(at, "%s/%s", in, out)`, config.Name, route.FullPath)
+		write(`    err = s.srv.RPC(ctx, "%s/%s", in, out)`, config.Name, route.FullPath)
 		write("    return")
 		write("}\n")
 	}
