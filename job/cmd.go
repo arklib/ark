@@ -15,7 +15,7 @@ type CmdJob interface {
 
 type CmdJobs = map[string]*Cmd
 
-func GetListByFilter(jobs any, filter []string) CmdJobs {
+func GetListByFilter(jobs any, filter ...string) CmdJobs {
 	cmdJobs := make(CmdJobs)
 
 	rJobs := reflect.ValueOf(jobs).Elem()
@@ -30,17 +30,17 @@ func GetListByFilter(jobs any, filter []string) CmdJobs {
 			continue
 		}
 
-		cmd := job.GetCmd()
-		if len(filter) > 0 && filter[0] != "all" && !lo.Contains(filter, cmd.Queue) {
+		cmdJob := job.GetCmd()
+		if len(filter) > 0 && filter[0] != "all" && !lo.Contains(filter, cmdJob.Name) {
 			continue
 		}
-		cmdJobs[cmd.Queue] = cmd
+		cmdJobs[cmdJob.Name] = cmdJob
 	}
 	return cmdJobs
 }
 
 func GetList(jobs any) CmdJobs {
-	return GetListByFilter(jobs, []string{})
+	return GetListByFilter(jobs)
 }
 
 func PrintList(jobs any) {
@@ -51,13 +51,13 @@ func PrintList(jobs any) {
 	}
 }
 
-func Run(jobs any, queues []string) {
-	if len(queues) == 0 {
+func Run(jobs any, names []string) {
+	if len(names) == 0 {
 		PrintList(jobs)
 		return
 	}
 
-	for _, job := range GetListByFilter(jobs, queues) {
+	for _, job := range GetListByFilter(jobs, names...) {
 		go func() {
 			if err := job.Run(); err != nil {
 				log.Print(err)
@@ -67,17 +67,17 @@ func Run(jobs any, queues []string) {
 	select {}
 }
 
-func RunRetry(jobs any, queues []string) {
-	if len(queues) == 0 {
+func RunRetry(jobs any, names []string) {
+	if len(names) == 0 {
 		PrintList(jobs)
 		return
 	}
 
-	jobList := GetListByFilter(jobs, queues)
+	jobList := GetListByFilter(jobs, names...)
 	for {
 		for _, job := range jobList {
 			if err := job.Retry(); err != nil {
-				log.Printf("[job.retry] queue: %s, error: %s\n", job.Queue, err.Error())
+				log.Printf("[job.retry] name: %s, error: %s\n", job.Name, err.Error())
 				continue
 			}
 		}

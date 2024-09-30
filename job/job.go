@@ -50,7 +50,7 @@ type (
 	}
 
 	Cmd struct {
-		Queue string
+		Name  string
 		Run   func() error
 		Retry func() error
 	}
@@ -77,7 +77,7 @@ func Define[Data any](c Config) *Job[Data] {
 
 func (t *Job[Data]) GetCmd() *Cmd {
 	return &Cmd{
-		Queue: t.queue,
+		Name:  t.queue,
 		Run:   t.Run,
 		Retry: t.Retry,
 	}
@@ -104,7 +104,7 @@ func (t *Job[Data]) Run() error {
 	for {
 		rawData, err := t.driver.Pop(ctx, t.queue)
 		if err != nil {
-			log.Printf("[job] queue: '%s', error: '%s'", t.queue, err)
+			log.Printf("[job] name: '%s', error: '%s'", t.queue, err)
 			time.Sleep(time.Second)
 			continue
 		}
@@ -139,7 +139,7 @@ func (t *Job[Data]) Retry() error {
 
 	ctx := context.Background()
 	push := func(id string, data []byte) error {
-		log.Printf("[job.retry] jobId: %s, queue: %s\n", id, t.queue)
+		log.Printf("[job.retry] jobId: %s, name: %s\n", id, t.queue)
 		return t.driver.Push(ctx, t.queue, data)
 	}
 	return t.retryDriver.Run(t.queue, push)
