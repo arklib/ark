@@ -15,7 +15,7 @@ type CmdJob interface {
 
 type CmdJobs = map[string]*Cmd
 
-func GetListByFilter(jobs any, filter ...string) CmdJobs {
+func GetList(jobs any, filter ...string) CmdJobs {
 	cmdJobs := make(CmdJobs)
 
 	rJobs := reflect.ValueOf(jobs).Elem()
@@ -39,10 +39,6 @@ func GetListByFilter(jobs any, filter ...string) CmdJobs {
 	return cmdJobs
 }
 
-func GetList(jobs any) CmdJobs {
-	return GetListByFilter(jobs)
-}
-
 func PrintList(jobs any) {
 	fmt.Println("jobs:")
 	fmt.Println("* all")
@@ -57,7 +53,7 @@ func Run(jobs any, names []string) {
 		return
 	}
 
-	for _, job := range GetListByFilter(jobs, names...) {
+	for _, job := range GetList(jobs, names...) {
 		go func() {
 			if err := job.Run(); err != nil {
 				log.Print(err)
@@ -73,7 +69,7 @@ func RunRetry(jobs any, names []string) {
 		return
 	}
 
-	jobList := GetListByFilter(jobs, names...)
+	jobList := GetList(jobs, names...)
 	for {
 		for _, job := range jobList {
 			if err := job.Retry(); err != nil {
