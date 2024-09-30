@@ -48,6 +48,7 @@ func newType(pkg *Package, rType reflect.Type, prefix string) *Type {
 		switch {
 		case t.PkgName == pkg.name:
 			t.FlatName = lo.PascalCase(t.Prefix) + t.Name
+			t.isRename = true
 		case t.Mod == pkg.mod:
 			t.FlatName = fmt.Sprintf("%s_%s", strings.ToUpper(t.PkgName), t.Name)
 			t.isRename = true
