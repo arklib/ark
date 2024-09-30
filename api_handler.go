@@ -100,14 +100,13 @@ func (proxy *ApiProxy) HttpHandler(ctx context.Context, reqCtx *hz.RequestContex
 
 	// validate input
 	lang := string(reqCtx.GetHeader("Accept-Language"))
-	err = srv.Validator.Test(in, lang)
-	if err != nil {
+	if err = srv.Validator.Test(in, lang); err != nil {
 		result.Error(reqCtx, err)
 		return
 	}
 
 	// proxy handle
-	c := newCtx(ctx, reqCtx, srv)
+	c := newCtx(ctx, srv, reqCtx)
 	payload, err := proxy.Handle(c, in, proxy.NewOutput())
 	if err != nil {
 		result.Error(reqCtx, err)

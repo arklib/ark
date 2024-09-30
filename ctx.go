@@ -12,7 +12,7 @@ type Ctx struct {
 	srv *Server
 }
 
-func newCtx(ctx context.Context, req any, srv *Server) *Ctx {
+func newCtx(ctx context.Context, srv *Server, req any) *Ctx {
 	return &Ctx{ctx, req, srv}
 }
 
