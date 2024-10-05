@@ -49,27 +49,6 @@ func newRPCServer(srv *Server) *rpcServer {
 	return s
 }
 
-func (s *rpcServer) run() error {
-	if s.keSrv == nil {
-		if err := s.init(); err != nil {
-			return err
-		}
-	}
-	// setup router
-	err := s.RPCRouter.setupRouter(s, &s.Routes)
-	if err != nil {
-		return err
-	}
-
-	// gen code
-	if s.srv.IsDev() {
-		if err = s.genCode(); err != nil {
-			return err
-		}
-	}
-	return s.keSrv.Run()
-}
-
 func (s *rpcServer) init() error {
 	srv := s.srv
 	srv.Logger.Debug("[ark] init rpc server")
@@ -120,17 +99,15 @@ func (s *rpcServer) init() error {
 		options = append(options, kesrv.WithRegistry(r))
 	}
 
-	// service info
+	// new server
+	s.keSrv = kesrv.NewServer(options...)
+
+	// register service
 	s.keSvc = &kesvc.ServiceInfo{
 		ServiceName:  config.Name,
 		Methods:      make(map[string]kesvc.MethodInfo),
 		PayloadCodec: kesvc.Thrift,
 	}
-
-	// new server
-	s.keSrv = kesrv.NewServer(options...)
-
-	// register service
 	err = s.keSrv.RegisterService(s.keSvc, new(struct{}))
 	if err != nil {
 		return err
@@ -147,6 +124,27 @@ func (s *rpcServer) init() error {
 	}
 
 	return nil
+}
+
+func (s *rpcServer) run() error {
+	if s.keSrv == nil {
+		if err := s.init(); err != nil {
+			return err
+		}
+	}
+	// setup router
+	err := s.RPCRouter.setupRouter(s, &s.Routes)
+	if err != nil {
+		return err
+	}
+
+	// gen code
+	if s.srv.IsDev() {
+		if err = s.genCode(); err != nil {
+			return err
+		}
+	}
+	return s.keSrv.Run()
 }
 
 func (s *rpcServer) UseRecovery() ApiMiddleware {

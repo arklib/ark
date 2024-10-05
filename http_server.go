@@ -27,20 +27,6 @@ func newHttpServer(srv *Server) *httpServer {
 	return s
 }
 
-func (s *httpServer) run() error {
-	if s.hzSrv == nil {
-		s.init()
-	}
-
-	// setup router
-	err := s.setupRouter(s, &s.Routes)
-	if err != nil {
-		return err
-	}
-
-	return s.hzSrv.Run()
-}
-
 func (s *httpServer) init() {
 	srv := s.srv
 	srv.Logger.Debug("[ark] init http server")
@@ -94,6 +80,20 @@ func (s *httpServer) init() {
 	}
 
 	s.hzSrv = hzSrv
+}
+
+func (s *httpServer) run() error {
+	if s.hzSrv == nil {
+		s.init()
+	}
+
+	// setup router
+	err := s.setupRouter(s, &s.Routes)
+	if err != nil {
+		return err
+	}
+
+	return s.hzSrv.Run()
 }
 
 func (s *httpServer) HzServer() *hzsrv.Hertz {

@@ -16,6 +16,6 @@ func newCtx(ctx context.Context, srv *Server, req any) *Ctx {
 	return &Ctx{ctx, req, srv}
 }
 
-func (c *Ctx) HttpReq() *hz.RequestContext {
+func (c *Ctx) Http() *hz.RequestContext {
 	return c.req.(*hz.RequestContext)
 }

@@ -21,14 +21,14 @@ type (
 	Config struct {
 		Driver     Driver
 		Serializer serializer.Serializer
-		Scene      string
+		Name       string
 		TTL        uint
 	}
 
 	Cache[Data any] struct {
 		driver     Driver
 		serializer serializer.Serializer
-		scene      string
+		name       string
 		ttl        time.Duration
 	}
 )
@@ -41,13 +41,13 @@ func Define[Data any](c Config) Cache[Data] {
 	return Cache[Data]{
 		driver:     c.Driver,
 		serializer: c.Serializer,
-		scene:      c.Scene,
+		name:       c.Name,
 		ttl:        time.Duration(c.TTL) * time.Second,
 	}
 }
 
-func (c Cache[Data]) Set(ctx context.Context, key any, data *Data) error {
-	newKey := util.MakeStrKey(c.scene, key)
+func (c *Cache[Data]) Set(ctx context.Context, key any, data *Data) error {
+	newKey := util.MakeStrKey(c.name, key)
 	if newKey == "" {
 		return ErrKeyType
 	}
@@ -59,25 +59,39 @@ func (c Cache[Data]) Set(ctx context.Context, key any, data *Data) error {
 	return c.driver.Set(ctx, newKey, newData, c.ttl)
 }
 
-func (c Cache[Data]) Get(ctx context.Context, key any) (data *Data, err error) {
-	newKey := util.MakeStrKey(c.scene, key)
+func (c *Cache[Data]) Get(ctx context.Context, key any) (*Data, error) {
+	newKey := util.MakeStrKey(c.name, key)
 	if newKey == "" {
-		err = ErrKeyType
-		return
+		return nil, ErrKeyType
 	}
 
 	rawData, err := c.driver.Get(ctx, newKey)
 	if err != nil {
-		return
+		return nil, err
 	}
 
-	data = new(Data)
+	data := new(Data)
 	err = c.serializer.Decode(rawData, data)
 	return data, err
 }
 
-func (c Cache[Data]) Del(ctx context.Context, key any) error {
-	newKey := util.MakeStrKey(c.scene, key)
+func (c *Cache[Data]) GetOrSet(ctx context.Context, key any, handler func() (*Data, error)) (*Data, error) {
+	data, err := c.Get(ctx, key)
+	if err != nil {
+		return nil, err
+	}
+
+	data, err = handler()
+	if err != nil {
+		return nil, err
+	}
+
+	err = c.Set(ctx, key, data)
+	return data, err
+}
+
+func (c *Cache[Data]) Del(ctx context.Context, key any) error {
+	newKey := util.MakeStrKey(c.name, key)
 	if newKey == "" {
 		return ErrKeyType
 	}

@@ -19,7 +19,7 @@ type (
 
 	Config struct {
 		Driver Driver
-		Scene  string
+		Name   string
 		TTL    uint
 	}
 
@@ -31,7 +31,7 @@ type (
 
 	Lock struct {
 		driver Driver
-		scene  string
+		name   string
 		ttl    time.Duration
 	}
 )
@@ -39,19 +39,19 @@ type (
 func Define(c Config) *Lock {
 	return &Lock{
 		driver: c.Driver,
-		scene:  c.Scene,
+		name:   c.Name,
 		ttl:    time.Duration(c.TTL) * time.Second,
 	}
 }
 
 func (l *Lock) Lock(ctx context.Context, key any) (payload *Payload, err error) {
-	newKey := util.MakeStrKey(l.scene, key)
-	if newKey == "" {
+	strKey := util.MakeStrKey(l.name, key)
+	if strKey == "" {
 		err = ErrKeyType
 		return
 	}
 
-	lock, err := l.driver.Lock(ctx, newKey, l.ttl)
+	lock, err := l.driver.Lock(ctx, strKey, l.ttl)
 	if err != nil {
 		return
 	}
@@ -63,7 +63,7 @@ func (l *Lock) Lock(ctx context.Context, key any) (payload *Payload, err error) 
 	payload = &Payload{
 		ctx:    ctx,
 		driver: l.driver,
-		key:    newKey,
+		key:    strKey,
 	}
 	return
 }

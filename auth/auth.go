@@ -22,12 +22,12 @@ var ErrAuthFailed = errx.New("auth failed", 401)
 type Payload = jwt.MapClaims
 
 type Auth struct {
-	SecretKey []byte
-	Expire    int64
-	// example "header: Authorization, query: token, cookie: token"
+	SecretKey   []byte
+	Expire      int64
 	TokenLookup map[string]string
 }
 
+// tokenLookup: "header: Authorization, query: token, cookie: token"
 func New(secretKey string, expire int64, tokenLookup string) (*Auth, error) {
 	if len(secretKey) == 0 {
 		err := errx.Sprintf(
