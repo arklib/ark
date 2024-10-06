@@ -1,5 +1,5 @@
 version: '3'
-# go install github.com/go-job/job/v3/cmd/job@latest
+# go install github.com/go-task/task/v3/cmd/task@latest
 
 tasks:
   default:
