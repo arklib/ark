@@ -1,14 +1,16 @@
-package lock
+package driver
 
 import (
 	"context"
 	"time"
 
 	"github.com/redis/go-redis/v9"
+
+	"github.com/arklib/ark/lock"
 )
 
 type RedisDriver struct {
-	Driver
+	lock.Driver
 	client redis.Cmdable
 }
 

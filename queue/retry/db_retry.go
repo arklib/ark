@@ -1,21 +1,23 @@
-package queue
+package retry
 
 import (
 	"strconv"
 	"time"
 
 	"gorm.io/gorm"
+
+	"github.com/arklib/ark/queue"
 )
 
 type DBRetryDriver struct {
-	RetryDriver
+	queue.RetryDriver
 	db *gorm.DB
 }
 
-type TaskRetry struct {
+type QueueRetry struct {
 	ID        uint      `json:"id" gorm:"primaryKey"`
 	Topic     string    `json:"topic" gorm:"index:idx"`
-	Name      string    `json:"name" gorm:"index:idx"`
+	Task      string    `json:"task" gorm:"index:idx"`
 	IsFailed  bool      `json:"isFailed" gorm:"index:idx"`
 	Interval  uint      `json:"interval"`
 	Message   string    `json:"message" gorm:"type:json"`
@@ -28,57 +30,57 @@ func NewDBRetryDriver(db *gorm.DB) *DBRetryDriver {
 	return &DBRetryDriver{db: db}
 }
 
-func (r *DBRetryDriver) Init(topic, name string) error {
-	hasTable := r.db.Migrator().HasTable("task_retry")
+func (r *DBRetryDriver) Init(topic, task string) error {
+	hasTable := r.db.Migrator().HasTable("queue_retry")
 	if !hasTable {
-		return r.db.AutoMigrate(&TaskRetry{})
+		return r.db.AutoMigrate(&QueueRetry{})
 	}
 	return nil
 }
 
-func (r *DBRetryDriver) Add(topic, name string, rawMessage []byte, errMessage string, interval uint, isFailed bool) error {
+func (r *DBRetryDriver) Add(topic, task string, rawMessage []byte, errMessage string, interval uint, isFailed bool) error {
 	second := time.Duration(interval) * time.Second
 
-	task := &TaskRetry{
+	item := &QueueRetry{
 		Topic:    topic,
-		Name:     name,
+		Task:     task,
 		Message:  string(rawMessage),
 		Error:    errMessage,
 		IsFailed: isFailed,
 		Interval: interval,
 		NextAt:   time.Now().Add(second),
 	}
-	return r.db.Create(task).Error
+	return r.db.Create(item).Error
 }
 
-func (r *DBRetryDriver) Run(topic string, name string, push RetryPush) error {
+func (r *DBRetryDriver) Run(topic string, task string, push queue.RetryPush) error {
 	page := 1
 	for {
-		var tasks []TaskRetry
+		var list []QueueRetry
 
 		pageSize := 100
 		offset := (page - 1) * pageSize
 		result := r.db.
 			Where("topic = ?", topic).
-			Where("name = ?", name).
+			Where("task = ?", task).
 			Where("is_failed = ?", false).
 			Where("next_at < ?", time.Now()).
 			Order("id asc").
 			Offset(offset).
 			Limit(pageSize).
-			Find(&tasks)
+			Find(&list)
 
 		if result.RowsAffected == 0 {
 			return nil
 		}
 
-		for _, task := range tasks {
-			id := strconv.Itoa(int(task.ID))
-			err := push(id, []byte(task.Message))
+		for _, item := range list {
+			id := strconv.Itoa(int(item.ID))
+			err := push(id, []byte(item.Message))
 			if err != nil {
 				return err
 			}
-			r.db.Delete(&task)
+			r.db.Delete(&item)
 		}
 		page++
 	}

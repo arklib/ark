@@ -11,9 +11,8 @@ import (
 	"github.com/arklib/ark/config"
 	"github.com/arklib/ark/logger"
 	"github.com/arklib/ark/registry"
+	"github.com/arklib/ark/task"
 	"github.com/arklib/ark/validator"
-
-	"github.com/spf13/cobra"
 )
 
 type ServerConfig struct {
@@ -70,7 +69,7 @@ type Server struct {
 	HttpServer *httpServer
 	RPCClient  *rpcClient
 	RPCServer  *rpcServer
-	Commands   []*cobra.Command
+	Task       *task.Task
 }
 
 func MustNewServer(c *config.Config) *Server {
@@ -106,6 +105,9 @@ func (srv *Server) init() (err error) {
 	} else {
 		srv.Logger = logger.New(sc.Logger)
 	}
+
+	// task
+	srv.Task = task.New()
 
 	// validator
 	srv.Validator = validator.New(sc.Lang)
@@ -184,12 +186,4 @@ func (srv *Server) Run() {
 	if err != nil {
 		srv.Logger.Error(err)
 	}
-}
-
-func (srv *Server) AddCommand(cmd *cobra.Command) {
-	srv.Commands = append(srv.Commands, cmd)
-}
-
-func (srv *Server) GetCommands() []*cobra.Command {
-	return srv.Commands
 }

@@ -15,7 +15,7 @@ type (
 	Hook[Data any] struct {
 		names []string
 		funcs map[string]Handler[Data]
-		
+
 		handlers       []Handler[Data]
 		notifyHandlers []NotifyHandler[Data]
 	}
@@ -28,36 +28,36 @@ func Define[Data any](names ...string) *Hook[Data] {
 	}
 }
 
-func (e *Hook[Data]) Notify(handlers ...NotifyHandler[Data]) *Hook[Data] {
-	e.notifyHandlers = append(e.notifyHandlers, handlers...)
-	return e
+func (h *Hook[Data]) Notify(handlers ...NotifyHandler[Data]) *Hook[Data] {
+	h.notifyHandlers = append(h.notifyHandlers, handlers...)
+	return h
 }
 
-func (e *Hook[Data]) Add(name string, handler Handler[Data]) {
-	if !lo.Contains(e.names, name) {
+func (h *Hook[Data]) Add(name string, handler Handler[Data]) {
+	if !lo.Contains(h.names, name) {
 		log.Fatal("handler name is undefined")
 	}
-	e.funcs[name] = handler
+	h.funcs[name] = handler
 
 	var handlers []Handler[Data]
-	for _, n := range e.names {
-		h, ok := e.funcs[n]
+	for _, n := range h.names {
+		h, ok := h.funcs[n]
 		if !ok {
 			continue
 		}
 		handlers = append(handlers, h)
 	}
-	e.handlers = handlers
+	h.handlers = handlers
 }
 
-func (e *Hook[Data]) Emit(ctx context.Context, data *Data) error {
+func (h *Hook[Data]) Emit(ctx context.Context, data *Data) error {
 	var next Next
 	index := 0
 	next = func() error {
-		if index == len(e.handlers) {
+		if index == len(h.handlers) {
 			return nil
 		}
-		handler := e.handlers[index]
+		handler := h.handlers[index]
 		index++
 		return handler(ctx, data, next)
 	}
@@ -67,7 +67,7 @@ func (e *Hook[Data]) Emit(ctx context.Context, data *Data) error {
 	}
 
 	// notify
-	for _, handler := range e.notifyHandlers {
+	for _, handler := range h.notifyHandlers {
 		if err := handler(ctx, data); err != nil {
 			return err
 		}

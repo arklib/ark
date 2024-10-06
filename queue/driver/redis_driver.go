@@ -1,4 +1,4 @@
-package queue
+package driver
 
 import (
 	"context"
@@ -6,12 +6,16 @@ import (
 	"log"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/redis/go-redis/v9"
+	"github.com/spf13/cast"
+
+	"github.com/arklib/ark/queue"
 )
 
 type RedisDriver struct {
-	Driver
+	queue.Driver
+	ttl    int64
+	maxLen int64
 	client redis.Cmdable
 }
 
@@ -19,30 +23,53 @@ func NewRedisDriver(client redis.Cmdable) *RedisDriver {
 	return &RedisDriver{client: client}
 }
 
+func (r *RedisDriver) New() *RedisDriver {
+	return &RedisDriver{
+		ttl:    r.ttl,
+		maxLen: r.maxLen,
+		client: r.client,
+	}
+}
+
+func (r *RedisDriver) WithTTL(ttl int64) *RedisDriver {
+	r.ttl = ttl
+	return r
+}
+
+func (r *RedisDriver) WithMaxLen(len int64) *RedisDriver {
+	r.maxLen = len
+	return r
+}
+
 func (r *RedisDriver) Produce(ctx context.Context, topic string, message []byte) error {
 	args := &redis.XAddArgs{
 		Stream: topic,
 		Values: map[string]any{"message": string(message)},
+		Approx: true,
+	}
+
+	// auto clear message
+	switch {
+	case r.maxLen > 0:
+		args.MaxLen = r.maxLen
+	case r.ttl > 0:
+		expired := time.Now().Unix() - r.ttl
+		args.MinID = fmt.Sprintf("%s-0", cast.ToString(expired*1000))
 	}
 	return r.client.XAdd(ctx, args).Err()
 }
 
-func (r *RedisDriver) Consume(ctx context.Context, topic, group string, handler ConsumeTaskHandler) error {
-	err := r.InitGroup(ctx, topic, group)
+func (r *RedisDriver) Consume(ctx context.Context, topic, group string, handler queue.ConsumeTaskHandler) error {
+	err := r.initConsume(ctx, topic, group)
 	if err != nil {
 		return err
 	}
 
-	u, err := uuid.NewRandom()
-	if err != nil {
-		return err
-	}
 	args := &redis.XReadGroupArgs{
 		Group:    group,
-		Consumer: u.String(),
+		Consumer: group,
 		Streams:  []string{topic, ">"},
 		Block:    0,
-		// Count:    1,
 	}
 	for {
 		streams, err := r.client.XReadGroup(ctx, args).Result()
@@ -61,10 +88,11 @@ func (r *RedisDriver) Consume(ctx context.Context, topic, group string, handler 
 
 			err = handler([]byte(rawMessage.(string)))
 			if err != nil {
+				time.Sleep(100 * time.Microsecond)
 				continue
 			}
 
-			_, err = r.client.XAck(ctx, stream.Stream, group, message.ID).Result()
+			err = r.client.XAck(ctx, stream.Stream, group, message.ID).Err()
 			if err != nil {
 				log.Printf("[redis.xAck] topic: %s, group: %s, messageId: %s, error: %v\n",
 					topic, group, message.ID, err)
@@ -74,16 +102,31 @@ func (r *RedisDriver) Consume(ctx context.Context, topic, group string, handler 
 	}
 }
 
-func (r *RedisDriver) InitGroup(ctx context.Context, topic, name string) error {
+func (r *RedisDriver) initConsume(ctx context.Context, topic, groupName string) error {
+	for {
+		length, err := r.client.XLen(ctx, topic).Result()
+		if err != nil {
+			return err
+		}
+
+		if length > 0 {
+			break
+		}
+
+		// wait first message
+		time.Sleep(time.Second)
+		continue
+	}
+
 	groups, err := r.client.XInfoGroups(ctx, topic).Result()
 	if err != nil {
 		return err
 	}
 
 	for _, group := range groups {
-		if name == group.Name {
+		if groupName == group.Name {
 			return nil
 		}
 	}
-	return r.client.XGroupCreateMkStream(ctx, topic, name, "0").Err()
+	return r.client.XGroupCreateMkStream(ctx, topic, groupName, "0").Err()
 }

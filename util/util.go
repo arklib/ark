@@ -1,11 +1,13 @@
 package util
 
 import (
+	"fmt"
 	"reflect"
 	"regexp"
 	"runtime"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/spf13/cast"
 )
@@ -44,4 +46,11 @@ func SplitSuffix(s, sep string) ([]string, string) {
 	paths := strings.Split(s, sep)
 	name := paths[len(paths)-1]
 	return paths, name
+}
+
+func ExecTime(name string, f func()) {
+	start := time.Now()
+	f()
+	elapsed := time.Since(start)
+	fmt.Printf("[%s] exec.time: %v\n", name, elapsed)
 }

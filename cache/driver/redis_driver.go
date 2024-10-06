@@ -1,14 +1,16 @@
-package cache
+package driver
 
 import (
 	"context"
 	"time"
 
 	"github.com/redis/go-redis/v9"
+
+	"github.com/arklib/ark/cache"
 )
 
 type RedisDriver struct {
-	Driver
+	cache.Driver
 	client redis.Cmdable
 }
 

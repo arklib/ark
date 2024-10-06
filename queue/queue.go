@@ -63,8 +63,8 @@ type (
 )
 
 func Define[Data any](c Config) *Queue[Data] {
-	if c.Name == "" || c.Driver == nil {
-		log.Fatal("[job.define] (Topic & Driver) is required.")
+	if c.Name == "" || c.Driver == nil || c.RetryDriver == nil {
+		log.Fatal("[queue.define] (Name & Driver & RetryDriver) is required.")
 	}
 
 	if c.Serializer == nil {
@@ -80,7 +80,7 @@ func Define[Data any](c Config) *Queue[Data] {
 	}
 }
 
-func (q *Queue[Data]) Send(ctx context.Context, data *Data) error {
+func (q *Queue[Data]) Push(ctx context.Context, data *Data) error {
 	message := &Message{
 		Data: data,
 	}
@@ -121,7 +121,7 @@ func (q *Queue[Data]) RunTask(name string) error {
 		return q.handleTask(ctx, task, rawMessage)
 	})
 	if err != nil {
-		err = fmt.Errorf("[queue.task] topic: %s, task: %s, error: %s\n", q.Name, name, err)
+		err = fmt.Errorf("[queue.task] consume, topic: %s, task: %s, error: %s\n", q.Name, name, err)
 		return err
 	}
 	return nil
@@ -151,8 +151,6 @@ func (q *Queue[Data]) handleTask(ctx context.Context, task *Task[Data], rawMessa
 }
 
 func (q *Queue[Data]) handleTaskError(task *Task[Data], message *Message, errMessage string) error {
-	log.Printf("[queue.task] topic: %s, task: %s, error: %s\n", q.Name, task.Name, errMessage)
-
 	message.Task = task.Name
 	message.RetryCount += 1
 	isFailed := task.MaxRetry > 0 && message.RetryCount > task.MaxRetry
@@ -162,26 +160,26 @@ func (q *Queue[Data]) handleTaskError(task *Task[Data], message *Message, errMes
 
 	rawMessage, err := q.Serializer.Encode(message)
 	if err != nil {
-		log.Printf("[queue.task] topic: %s, task: %s, error: %s\n", q.Name, task.Name, err)
+		log.Printf("[queue.task] encode, topic: %s, task: %s, error: %s\n", q.Name, task.Name, err)
 		return err
 	}
 
 	err = q.RetryDriver.Add(q.Name, task.Name, rawMessage, errMessage, task.RetryInterval, isFailed)
 	if err != nil {
-		log.Printf("[retry.add] topic: %s, task: %s, error: %s\n", q.Name, task.Name, err)
+		log.Printf("[queue.task] retry.add, topic: %s, task: %s, error: %s\n", q.Name, task.Name, err)
 		return err
 	}
 	return nil
 }
 
-func (q *Queue[Data]) RunRetryTask(name string) error {
+func (q *Queue[Data]) RunTaskRetry(name string) error {
 	if err := q.RetryDriver.Init(q.Name, name); err != nil {
 		return err
 	}
 
 	ctx := context.Background()
 	push := func(id string, rawMessage []byte) error {
-		log.Printf("[queue.retry] id: %s, topic: %s, task: %s\n", id, q.Name, name)
+		log.Printf("[queue.task] task.retry, id: %s, topic: %s, task: %s\n", id, q.Name, name)
 		return q.Driver.Produce(ctx, q.Name, rawMessage)
 	}
 	return q.RetryDriver.Run(q.Name, name, push)
@@ -196,7 +194,7 @@ func (q *Queue[Data]) GetCmdTasks() []*CmdTask {
 				return q.RunTask(task.Name)
 			},
 			Retry: func() error {
-				return q.RunRetryTask(task.Name)
+				return q.RunTaskRetry(task.Name)
 			},
 		}
 		cmdTasks = append(cmdTasks, cmdTask)
