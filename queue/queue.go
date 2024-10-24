@@ -9,10 +9,10 @@ import (
 )
 
 type (
-	ConsumeTaskHandler func(rawMessage []byte) error
-	Driver             interface {
+	ConsumeHandler func(rawMessage []byte) error
+	Driver         interface {
 		Produce(ctx context.Context, topic string, rawMessage []byte) error
-		Consume(ctx context.Context, topic, group string, handler ConsumeTaskHandler) error
+		Consume(ctx context.Context, topic, group string, handler ConsumeHandler) error
 	}
 
 	RetryPush   func(id string, rawMessage []byte) error

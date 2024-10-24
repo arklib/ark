@@ -94,9 +94,9 @@ func RunRetry(queues any, names []string) {
 		return
 	}
 
-	taskList := GetTasks(queues, names...)
+	tasks := GetTasks(queues, names...)
 	for {
-		for _, task := range taskList {
+		for _, task := range tasks {
 			if err := task.Retry(); err != nil {
 				log.Printf("[task.retry] topic: %s, error: %s\n", task.Name, err.Error())
 				continue

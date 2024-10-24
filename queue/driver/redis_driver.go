@@ -59,7 +59,7 @@ func (r *RedisDriver) Produce(ctx context.Context, topic string, message []byte)
 	return r.client.XAdd(ctx, args).Err()
 }
 
-func (r *RedisDriver) Consume(ctx context.Context, topic, group string, handler queue.ConsumeTaskHandler) error {
+func (r *RedisDriver) Consume(ctx context.Context, topic, group string, handler queue.ConsumeHandler) error {
 	err := r.initConsume(ctx, topic, group)
 	if err != nil {
 		return err

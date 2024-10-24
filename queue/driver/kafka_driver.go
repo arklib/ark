@@ -38,7 +38,7 @@ func (k *KafkaDriver) Produce(ctx context.Context, topic string, rawMessage []by
 	return k.Writer.WriteMessages(ctx, message)
 }
 
-func (k *KafkaDriver) Consume(ctx context.Context, topic, group string, handler queue.ConsumeTaskHandler) error {
+func (k *KafkaDriver) Consume(ctx context.Context, topic, group string, handler queue.ConsumeHandler) error {
 	r := kafka.NewReader(kafka.ReaderConfig{
 		Brokers: k.brokers,
 		GroupID: group,
